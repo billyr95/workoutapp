@@ -9,13 +9,10 @@ export async function POST(req: Request) {
   if (!workoutId || !name || !sets || !repMin || !repMax) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
-  const existingCount = db
-    .select()
-    .from(schema.exercises)
-    .all()
-    .filter((e) => e.workoutId === workoutId).length;
+  const allExercises = await db.select().from(schema.exercises);
+  const existingCount = allExercises.filter((e) => e.workoutId === workoutId).length;
 
-  const [row] = db
+  const [row] = await db
     .insert(schema.exercises)
     .values({
       workoutId,
@@ -26,8 +23,7 @@ export async function POST(req: Request) {
       restSeconds: restSeconds ?? null,
       sortOrder: existingCount,
     })
-    .returning()
-    .all();
+    .returning();
 
   return NextResponse.json(row);
 }
@@ -36,6 +32,6 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   const { id } = await req.json();
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
-  db.delete(schema.exercises).where(eq(schema.exercises.id, id)).run();
+  await db.delete(schema.exercises).where(eq(schema.exercises.id, id));
   return NextResponse.json({ ok: true });
 }

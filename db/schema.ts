@@ -1,7 +1,7 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { pgTable, serial, text, integer, real } from "drizzle-orm/pg-core";
 
-export const users = sqliteTable("users", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
   name: text("name").notNull(),
   heightFeet: integer("height_feet").notNull(),
   heightInches: integer("height_inches").notNull(),
@@ -14,22 +14,22 @@ export const users = sqliteTable("users", {
   fat: integer("fat").notNull(),
 });
 
-export const schedule = sqliteTable("schedule", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const schedule = pgTable("schedule", {
+  id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   day: text("day").notNull(), // "Monday" ... "Sunday"
   workoutType: text("workout_type").notNull(), // "Upper A" | "Cardio" | "Rest" ...
   category: text("category"), // "Strength" | "Hypertrophy" | null
 });
 
-export const workouts = sqliteTable("workouts", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const workouts = pgTable("workouts", {
+  id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   name: text("name").notNull(), // "Upper A" etc, matches schedule.workoutType
 });
 
-export const exercises = sqliteTable("exercises", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const exercises = pgTable("exercises", {
+  id: serial("id").primaryKey(),
   workoutId: integer("workout_id").notNull(),
   name: text("name").notNull(),
   sets: integer("sets").notNull(),
@@ -39,15 +39,15 @@ export const exercises = sqliteTable("exercises", {
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
-export const workoutLogs = sqliteTable("workout_logs", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const workoutLogs = pgTable("workout_logs", {
+  id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   date: text("date").notNull(), // ISO date
   workoutId: integer("workout_id").notNull(),
 });
 
-export const setLogs = sqliteTable("set_logs", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const setLogs = pgTable("set_logs", {
+  id: serial("id").primaryKey(),
   workoutLogId: integer("workout_log_id").notNull(),
   exerciseId: integer("exercise_id").notNull(),
   setNumber: integer("set_number").notNull(),
@@ -56,8 +56,8 @@ export const setLogs = sqliteTable("set_logs", {
   rpe: real("rpe"),
 });
 
-export const cardioLogs = sqliteTable("cardio_logs", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const cardioLogs = pgTable("cardio_logs", {
+  id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   date: text("date").notNull(),
   type: text("type").notNull(),
@@ -67,15 +67,15 @@ export const cardioLogs = sqliteTable("cardio_logs", {
   calories: integer("calories"),
 });
 
-export const weightLogs = sqliteTable("weight_logs", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const weightLogs = pgTable("weight_logs", {
+  id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   date: text("date").notNull(),
   weight: real("weight").notNull(), // supports 0.1 increments
 });
 
-export const measurements = sqliteTable("measurements", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const measurements = pgTable("measurements", {
+  id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   date: text("date").notNull(),
   waist: real("waist"),
@@ -87,8 +87,8 @@ export const measurements = sqliteTable("measurements", {
   neck: real("neck"),
 });
 
-export const personalRecords = sqliteTable("personal_records", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const personalRecords = pgTable("personal_records", {
+  id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   exerciseName: text("exercise_name").notNull(),
   weight: real("weight").notNull(),

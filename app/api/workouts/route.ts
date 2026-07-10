@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { USER_ID } from "@/lib/data";
 
@@ -13,67 +13,58 @@ export async function POST(req: Request) {
   }
 
   // upsert workout log for this date + workout
-  const existingLog = db
-    .select()
-    .from(schema.workoutLogs)
-    .all()
-    .find((l) => l.userId === USER_ID && l.date === date && l.workoutId === workoutId);
+  const allLogs = await db.select().from(schema.workoutLogs);
+  const existingLog = allLogs.find((l) => l.userId === USER_ID && l.date === date && l.workoutId === workoutId);
 
   let workoutLogId: number;
   if (existingLog) {
     workoutLogId = existingLog.id;
-    db.delete(schema.setLogs).where(eq(schema.setLogs.workoutLogId, workoutLogId)).run();
+    await db.delete(schema.setLogs).where(eq(schema.setLogs.workoutLogId, workoutLogId));
   } else {
-    const [created] = db
+    const [created] = await db
       .insert(schema.workoutLogs)
       .values({ userId: USER_ID, date, workoutId })
-      .returning()
-      .all();
+      .returning();
     workoutLogId = created.id;
   }
 
   for (const s of sets) {
-    db.insert(schema.setLogs)
-      .values({
-        workoutLogId,
-        exerciseId: s.exerciseId,
-        setNumber: s.setNumber,
-        weight: s.weight,
-        reps: s.reps,
-        rpe: s.rpe ?? null,
-      })
-      .run();
+    await db.insert(schema.setLogs).values({
+      workoutLogId,
+      exerciseId: s.exerciseId,
+      setNumber: s.setNumber,
+      weight: s.weight,
+      reps: s.reps,
+      rpe: s.rpe ?? null,
+    });
   }
 
   // PR detection: group sets by exercise, compare heaviest weight against existing PR
-  const exercises = db.select().from(schema.exercises).all();
+  const exercises = await db.select().from(schema.exercises);
   const byExercise = new Map<number, typeof sets>();
   for (const s of sets) {
     if (!byExercise.has(s.exerciseId)) byExercise.set(s.exerciseId, []);
     byExercise.get(s.exerciseId)!.push(s);
   }
 
+  const allPRs = await db.select().from(schema.personalRecords);
   const newPRs: { exercise: string; weight: number; reps: number }[] = [];
   for (const [exerciseId, exSets] of byExercise) {
     const exercise = exercises.find((e) => e.id === exerciseId);
     if (!exercise) continue;
     const topSet = exSets.reduce((a, b) => (b.weight > a.weight ? b : a), exSets[0]);
-    const existingPR = db
-      .select()
-      .from(schema.personalRecords)
-      .all()
-      .find((p) => p.userId === USER_ID && p.exerciseName === exercise.name);
+    const existingPR = allPRs.find((p) => p.userId === USER_ID && p.exerciseName === exercise.name);
 
     if (!existingPR || topSet.weight > existingPR.weight) {
       if (existingPR) {
-        db.update(schema.personalRecords)
+        await db
+          .update(schema.personalRecords)
           .set({ weight: topSet.weight, reps: topSet.reps, date })
-          .where(eq(schema.personalRecords.id, existingPR.id))
-          .run();
+          .where(eq(schema.personalRecords.id, existingPR.id));
       } else {
-        db.insert(schema.personalRecords)
-          .values({ userId: USER_ID, exerciseName: exercise.name, weight: topSet.weight, reps: topSet.reps, date })
-          .run();
+        await db
+          .insert(schema.personalRecords)
+          .values({ userId: USER_ID, exerciseName: exercise.name, weight: topSet.weight, reps: topSet.reps, date });
       }
       newPRs.push({ exercise: exercise.name, weight: topSet.weight, reps: topSet.reps });
     }

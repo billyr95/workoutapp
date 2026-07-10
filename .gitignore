@@ -45,3 +45,8 @@ db/*.db
 db/*.db-journal
 db/*.db-shm
 db/*.db-wal
+
+# local agent skill tooling (installed by `vercel install neon`)
+/.agents
+/.claude
+skills-lock.json

@@ -11,12 +11,8 @@ function isAuthorized(req: Request) {
 }
 
 export async function GET() {
-  const rows = db
-    .select()
-    .from(schema.cardioLogs)
-    .all()
-    .filter((c) => c.userId === USER_ID)
-    .sort((a, b) => b.date.localeCompare(a.date));
+  const allLogs = await db.select().from(schema.cardioLogs);
+  const rows = allLogs.filter((c) => c.userId === USER_ID).sort((a, b) => b.date.localeCompare(a.date));
   return NextResponse.json(rows);
 }
 
@@ -33,7 +29,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing type or durationMinutes" }, { status: 400 });
   }
 
-  const [row] = db
+  const [row] = await db
     .insert(schema.cardioLogs)
     .values({
       userId: USER_ID,
@@ -44,8 +40,7 @@ export async function POST(req: Request) {
       averageHeartRate: averageHeartRate ?? null,
       calories: calories ?? null,
     })
-    .returning()
-    .all();
+    .returning();
 
   return NextResponse.json(row);
 }

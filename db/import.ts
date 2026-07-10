@@ -34,72 +34,60 @@ function mapExercise(ex: JsonExercise) {
   };
 }
 
-function importData() {
+async function importData() {
   const raw = JSON.parse(readFileSync(join(__dirname, "import-data.json"), "utf-8"));
   const jsonWorkouts: JsonWorkout[] = raw.workouts;
 
   for (const jw of jsonWorkouts) {
     if (!jw.exercises || jw.exercises.length === 0) continue; // cardio entries have no exercise list
 
-    let workout = db
-      .select()
-      .from(schema.workouts)
-      .all()
-      .find((w) => w.userId === USER_ID && w.name === jw.name);
+    const allWorkouts = await db.select().from(schema.workouts);
+    let workout = allWorkouts.find((w) => w.userId === USER_ID && w.name === jw.name);
 
     if (!workout) {
-      [workout] = db.insert(schema.workouts).values({ userId: USER_ID, name: jw.name }).returning().all();
+      [workout] = await db.insert(schema.workouts).values({ userId: USER_ID, name: jw.name }).returning();
       console.log(`Created workout: ${jw.name}`);
     }
 
-    const existingExercises = db
-      .select()
-      .from(schema.exercises)
-      .all()
-      .filter((e) => e.workoutId === workout!.id);
+    const allExercises = await db.select().from(schema.exercises);
+    const existingExercises = allExercises.filter((e) => e.workoutId === workout!.id);
 
     if (existingExercises.length > 0) {
       console.log(`Skipping ${jw.name} — already has ${existingExercises.length} exercises.`);
       continue;
     }
 
-    jw.exercises.forEach((ex, i) => {
-      const mapped = mapExercise(ex);
-      db.insert(schema.exercises)
-        .values({ workoutId: workout!.id, sortOrder: i, ...mapped })
-        .run();
-    });
+    for (let i = 0; i < jw.exercises.length; i++) {
+      const mapped = mapExercise(jw.exercises[i]);
+      await db.insert(schema.exercises).values({ workoutId: workout!.id, sortOrder: i, ...mapped });
+    }
     console.log(`Inserted ${jw.exercises.length} exercises for ${jw.name}`);
   }
 
   // Logs
-  const existingWeightDates = new Set(
-    db.select().from(schema.weightLogs).all().filter((w) => w.userId === USER_ID).map((w) => w.date)
-  );
+  const allWeightLogs = await db.select().from(schema.weightLogs);
+  const existingWeightDates = new Set(allWeightLogs.filter((w) => w.userId === USER_ID).map((w) => w.date));
   for (const w of raw.logs?.weight ?? []) {
     if (existingWeightDates.has(w.date)) continue;
-    db.insert(schema.weightLogs).values({ userId: USER_ID, date: w.date, weight: w.weight }).run();
+    await db.insert(schema.weightLogs).values({ userId: USER_ID, date: w.date, weight: w.weight });
     console.log(`Logged weight ${w.weight} on ${w.date}`);
   }
 
-  const existingMeasurementDates = new Set(
-    db.select().from(schema.measurements).all().filter((m) => m.userId === USER_ID).map((m) => m.date)
-  );
+  const allMeasurements = await db.select().from(schema.measurements);
+  const existingMeasurementDates = new Set(allMeasurements.filter((m) => m.userId === USER_ID).map((m) => m.date));
   for (const m of raw.logs?.measurements ?? []) {
     if (existingMeasurementDates.has(m.date)) continue;
-    db.insert(schema.measurements)
-      .values({
-        userId: USER_ID,
-        date: m.date,
-        waist: m.waist ?? null,
-        chest: m.chest ?? null,
-        leftArm: m.arms ?? null,
-        rightArm: m.arms ?? null,
-        leftThigh: m.thighs ?? null,
-        rightThigh: m.thighs ?? null,
-        neck: m.neck ?? null,
-      })
-      .run();
+    await db.insert(schema.measurements).values({
+      userId: USER_ID,
+      date: m.date,
+      waist: m.waist ?? null,
+      chest: m.chest ?? null,
+      leftArm: m.arms ?? null,
+      rightArm: m.arms ?? null,
+      leftThigh: m.thighs ?? null,
+      rightThigh: m.thighs ?? null,
+      neck: m.neck ?? null,
+    });
     console.log(`Logged measurements on ${m.date}`);
   }
 

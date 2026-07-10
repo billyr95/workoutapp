@@ -8,11 +8,8 @@ export async function POST(req: Request) {
   const body = await req.json();
   const date = body.date || new Date().toISOString().slice(0, 10);
 
-  const existing = db
-    .select()
-    .from(schema.measurements)
-    .all()
-    .find((m) => m.userId === USER_ID && m.date === date);
+  const allMeasurements = await db.select().from(schema.measurements);
+  const existing = allMeasurements.find((m) => m.userId === USER_ID && m.date === date);
 
   const values = {
     waist: body.waist ?? null,
@@ -25,9 +22,9 @@ export async function POST(req: Request) {
   };
 
   if (existing) {
-    db.update(schema.measurements).set(values).where(eq(schema.measurements.id, existing.id)).run();
+    await db.update(schema.measurements).set(values).where(eq(schema.measurements.id, existing.id));
   } else {
-    db.insert(schema.measurements).values({ userId: USER_ID, date, ...values }).run();
+    await db.insert(schema.measurements).values({ userId: USER_ID, date, ...values });
   }
 
   return NextResponse.json({ ok: true });

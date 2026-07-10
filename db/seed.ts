@@ -1,13 +1,13 @@
 import { db, schema } from "./index";
 
 async function seed() {
-  const existing = db.select().from(schema.users).all();
+  const existing = await db.select().from(schema.users);
   if (existing.length > 0) {
     console.log("Already seeded, skipping.");
     return;
   }
 
-  const [user] = db
+  const [user] = await db
     .insert(schema.users)
     .values({
       name: "Billy",
@@ -21,8 +21,7 @@ async function seed() {
       carbs: 220,
       fat: 70,
     })
-    .returning()
-    .all();
+    .returning();
 
   const scheduleRows = [
     { day: "Monday", workoutType: "Upper A", category: "Strength" },
@@ -34,17 +33,13 @@ async function seed() {
     { day: "Sunday", workoutType: "Rest", category: null },
   ];
   for (const s of scheduleRows) {
-    db.insert(schema.schedule).values({ userId: user.id, ...s }).run();
+    await db.insert(schema.schedule).values({ userId: user.id, ...s });
   }
 
   const workoutNames = ["Upper A", "Lower A", "Upper B", "Lower B"];
   const workoutIds: Record<string, number> = {};
   for (const name of workoutNames) {
-    const [w] = db
-      .insert(schema.workouts)
-      .values({ userId: user.id, name })
-      .returning()
-      .all();
+    const [w] = await db.insert(schema.workouts).values({ userId: user.id, name }).returning();
     workoutIds[name] = w.id;
   }
 
@@ -57,23 +52,17 @@ async function seed() {
     { name: "Lateral Raises", sets: 3, repMin: 15, repMax: 15, restSeconds: null },
     { name: "Hanging Leg Raises", sets: 3, repMin: 12, repMax: 15, restSeconds: null },
   ];
-  upperAExercises.forEach((ex, i) => {
-    db.insert(schema.exercises)
-      .values({ workoutId: workoutIds["Upper A"], sortOrder: i, ...ex })
-      .run();
-  });
+  for (let i = 0; i < upperAExercises.length; i++) {
+    await db.insert(schema.exercises).values({ workoutId: workoutIds["Upper A"], sortOrder: i, ...upperAExercises[i] });
+  }
 
-  const [workoutLog] = db
+  const [workoutLog] = await db
     .insert(schema.workoutLogs)
     .values({ userId: user.id, date: "2026-07-08", workoutId: workoutIds["Upper A"] })
-    .returning()
-    .all();
+    .returning();
 
-  const bench = db
-    .select()
-    .from(schema.exercises)
-    .all()
-    .find((e) => e.name === "Bench Press");
+  const allExercises = await db.select().from(schema.exercises);
+  const bench = allExercises.find((e) => e.name === "Bench Press");
 
   if (bench) {
     const benchSets = [
@@ -82,47 +71,37 @@ async function seed() {
       { weight: 135, reps: 6, rpe: 9 },
       { weight: 135, reps: 5, rpe: 10 },
     ];
-    benchSets.forEach((s, i) => {
-      db.insert(schema.setLogs)
-        .values({
-          workoutLogId: workoutLog.id,
-          exerciseId: bench.id,
-          setNumber: i + 1,
-          ...s,
-        })
-        .run();
-    });
+    for (let i = 0; i < benchSets.length; i++) {
+      await db.insert(schema.setLogs).values({
+        workoutLogId: workoutLog.id,
+        exerciseId: bench.id,
+        setNumber: i + 1,
+        ...benchSets[i],
+      });
+    }
 
-    db.insert(schema.personalRecords)
-      .values({
-        userId: user.id,
-        exerciseName: "Bench Press",
-        weight: 135,
-        reps: 8,
-        date: "2026-07-08",
-      })
-      .run();
+    await db.insert(schema.personalRecords).values({
+      userId: user.id,
+      exerciseName: "Bench Press",
+      weight: 135,
+      reps: 8,
+      date: "2026-07-08",
+    });
   }
 
-  db.insert(schema.cardioLogs)
-    .values({
-      userId: user.id,
-      date: "2026-07-09",
-      type: "Stationary Bike",
-      durationMinutes: 40,
-      distance: 12.4,
-      averageHeartRate: 142,
-      calories: 385,
-    })
-    .run();
+  await db.insert(schema.cardioLogs).values({
+    userId: user.id,
+    date: "2026-07-09",
+    type: "Stationary Bike",
+    durationMinutes: 40,
+    distance: 12.4,
+    averageHeartRate: 142,
+    calories: 385,
+  });
 
-  db.insert(schema.weightLogs)
-    .values({ userId: user.id, date: "2026-07-08", weight: 194 })
-    .run();
+  await db.insert(schema.weightLogs).values({ userId: user.id, date: "2026-07-08", weight: 194 });
 
-  db.insert(schema.measurements)
-    .values({ userId: user.id, date: "2026-07-08", waist: 32 })
-    .run();
+  await db.insert(schema.measurements).values({ userId: user.id, date: "2026-07-08", waist: 32 });
 
   console.log("Seed complete. User id:", user.id);
 }
