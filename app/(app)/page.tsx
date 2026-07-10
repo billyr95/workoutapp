@@ -31,6 +31,10 @@ export default function TodayPage() {
     () => data?.workouts.find((w) => w.name === sched?.workoutType),
     [data, sched]
   );
+  const isSkippedToday = useMemo(
+    () => !!data?.workoutLogs.some((l) => l.workoutId === workout?.id && l.date === todayStr() && l.skipped),
+    [data, workout]
+  );
 
   if (loading || !data) {
     return <p className="font-mono text-sm text-[var(--muted)]">Loading…</p>;
@@ -80,6 +84,18 @@ export default function TodayPage() {
     setDraft({});
     await refetch();
     flash(json.newPRs?.length ? `Saved — new PR: ${json.newPRs.map((p: any) => p.exercise).join(", ")}` : "Workout saved");
+  }
+
+  async function toggleSkip() {
+    if (!workout) return;
+    const method = isSkippedToday ? "DELETE" : "POST";
+    await fetch("/api/workouts/skip", {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workoutId: workout.id, date: todayStr() }),
+    });
+    await refetch();
+    flash(isSkippedToday ? "Skip removed" : "Marked as skipped");
   }
 
   async function saveCardio() {
@@ -153,32 +169,48 @@ export default function TodayPage() {
       {sched?.category && workout && (
         <>
           <div className="card mb-3">
-            <span className="inline-block font-display text-[13px] px-2.5 py-0.5 border border-[var(--red-dim)] text-[var(--red)] rounded bg-[rgba(200,16,46,0.08)]">
-              {sched.category}
-            </span>
-            <div className="font-display text-3xl mt-1">{sched.workoutType}</div>
-            <div className="font-mono text-xs text-[var(--chalk-dim)]">{workout.exercises.length} exercises</div>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <span className="inline-block font-display text-[13px] px-2.5 py-0.5 border border-[var(--red-dim)] text-[var(--red)] rounded bg-[rgba(200,16,46,0.08)]">
+                  {sched.category}
+                </span>
+                <div className="font-display text-3xl mt-1">{sched.workoutType}</div>
+                <div className="font-mono text-xs text-[var(--chalk-dim)]">{workout.exercises.length} exercises</div>
+              </div>
+              <label className="flex items-center gap-1.5 cursor-pointer shrink-0 mt-1">
+                <input type="checkbox" checked={isSkippedToday} onChange={toggleSkip} className="!w-auto" />
+                <span className="font-mono text-[11px] text-[var(--chalk-dim)]">Skipped today</span>
+              </label>
+            </div>
           </div>
 
-          {workout.exercises.length === 0 && (
+          {isSkippedToday ? (
             <div className="card text-center text-[var(--muted)] font-mono text-xs">
-              No exercises set for {sched.workoutType} yet. Add them in the Schedule tab.
+              Marked as skipped for today. Uncheck to log it instead.
             </div>
-          )}
+          ) : (
+            <>
+              {workout.exercises.length === 0 && (
+                <div className="card text-center text-[var(--muted)] font-mono text-xs">
+                  No exercises set for {sched.workoutType} yet. Add them in the Schedule tab.
+                </div>
+              )}
 
-          {workout.exercises.map((ex) => (
-            <ExerciseCard
-              key={ex.id}
-              exercise={ex}
-              lastSets={lastSetsFor(ex.id)}
-              pr={prFor(ex.name)}
-              draft={draft[ex.id] || []}
-              onChange={(idx, field, value) => updateSet(ex.id, idx, field, value)}
-            />
-          ))}
+              {workout.exercises.map((ex) => (
+                <ExerciseCard
+                  key={ex.id}
+                  exercise={ex}
+                  lastSets={lastSetsFor(ex.id)}
+                  pr={prFor(ex.name)}
+                  draft={draft[ex.id] || []}
+                  onChange={(idx, field, value) => updateSet(ex.id, idx, field, value)}
+                />
+              ))}
 
-          {workout.exercises.length > 0 && (
-            <button className="btn w-full mt-1" onClick={saveWorkout}>Save Workout</button>
+              {workout.exercises.length > 0 && (
+                <button className="btn w-full mt-1" onClick={saveWorkout}>Save Workout</button>
+              )}
+            </>
           )}
         </>
       )}

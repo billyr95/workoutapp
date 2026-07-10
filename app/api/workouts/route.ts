@@ -39,6 +39,9 @@ export async function POST(req: Request) {
   if (existingLog) {
     workoutLogId = existingLog.id;
     await db.delete(schema.setLogs).where(eq(schema.setLogs.workoutLogId, workoutLogId));
+    if (existingLog.skipped) {
+      await db.update(schema.workoutLogs).set({ skipped: false }).where(eq(schema.workoutLogs.id, workoutLogId));
+    }
   } else {
     const [created] = await db
       .insert(schema.workoutLogs)

@@ -43,6 +43,7 @@ export type WorkoutLog = {
   userId: number;
   date: string;
   workoutId: number;
+  skipped: boolean;
   sets: SetLog[];
 };
 

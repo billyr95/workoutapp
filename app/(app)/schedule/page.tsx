@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAppData } from "@/lib/useAppData";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 type DayType = "Rest" | "Cardio" | "Workout";
 type DayForm = { type: DayType; name: string; category: "Strength" | "Hypertrophy" };
+type SavedProgram = { id: number; name: string; createdAt: string };
 
 function dayFormFor(sched: { workoutType: string; category: string | null } | undefined): DayForm {
   if (!sched || sched.workoutType === "Rest") return { type: "Rest", name: "", category: "Strength" };
@@ -20,6 +21,19 @@ export default function SchedulePage() {
   const [form, setForm] = useState({ name: "", sets: "", repMin: "", repMax: "" });
   const [dayForm, setDayForm] = useState<DayForm>({ type: "Rest", name: "", category: "Strength" });
   const [savingDay, setSavingDay] = useState(false);
+
+  const [programs, setPrograms] = useState<SavedProgram[]>([]);
+  const [showSaveForm, setShowSaveForm] = useState(false);
+  const [programName, setProgramName] = useState("");
+  const [savingProgram, setSavingProgram] = useState(false);
+  const [selectedProgramId, setSelectedProgramId] = useState("");
+  const [loadingProgram, setLoadingProgram] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/programs")
+      .then((res) => res.json())
+      .then(setPrograms);
+  }, []);
 
   const editingSched = data && editingDay ? data.schedule.find((s) => s.day === editingDay) : null;
   const editingWorkout = data && editingSched ? data.workouts.find((w) => w.name === editingSched.workoutType) : null;
@@ -79,8 +93,100 @@ export default function SchedulePage() {
     await refetch();
   }
 
+  async function saveProgram() {
+    if (!programName.trim()) return;
+    setSavingProgram(true);
+    const res = await fetch("/api/programs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: programName.trim() }),
+    });
+    const saved = await res.json();
+    setPrograms((prev) => [saved, ...prev]);
+    setProgramName("");
+    setShowSaveForm(false);
+    setSavingProgram(false);
+  }
+
+  async function loadProgram() {
+    if (!selectedProgramId) return;
+    setLoadingProgram(true);
+    await fetch("/api/programs/load", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ programId: Number(selectedProgramId) }),
+    });
+    setLoadingProgram(false);
+    await refetch();
+  }
+
+  async function deleteProgram(id: number) {
+    await fetch("/api/programs", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    setPrograms((prev) => prev.filter((p) => p.id !== id));
+    if (selectedProgramId === String(id)) setSelectedProgramId("");
+  }
+
   return (
     <div>
+      <div className="section-label mb-3 flex items-center justify-between !gap-3">
+        <span>Programs</span>
+        <button
+          className="btn-ghost !py-1 !px-2.5 !text-[11px] normal-case tracking-normal rounded shrink-0"
+          onClick={() => setShowSaveForm((v) => !v)}
+        >
+          Save Program
+        </button>
+      </div>
+      <div className="card mb-3.5">
+        {showSaveForm && (
+          <div className="flex gap-2 mb-2.5">
+            <input
+              placeholder="Program name (e.g. Push Pull Legs)"
+              value={programName}
+              onChange={(e) => setProgramName(e.target.value)}
+            />
+            <button className="btn !py-1.5 !px-3 !text-[11px] shrink-0" onClick={saveProgram} disabled={savingProgram}>
+              {savingProgram ? "Saving…" : "Save"}
+            </button>
+          </div>
+        )}
+
+        {programs.length === 0 ? (
+          <p className="font-mono text-xs text-[var(--muted)]">No saved programs yet.</p>
+        ) : (
+          <div className="flex gap-2">
+            <select value={selectedProgramId} onChange={(e) => setSelectedProgramId(e.target.value)} className="flex-1">
+              <option value="">Select a saved program…</option>
+              {programs.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <button
+              className="btn !py-1.5 !px-3 !text-[11px] shrink-0"
+              onClick={loadProgram}
+              disabled={!selectedProgramId || loadingProgram}
+            >
+              {loadingProgram ? "Loading…" : "Load"}
+            </button>
+            {selectedProgramId && (
+              <span
+                className="text-[var(--muted)] hover:text-[var(--red)] cursor-pointer font-mono text-sm px-1 self-center"
+                onClick={() => deleteProgram(Number(selectedProgramId))}
+                title="Delete this saved program"
+              >
+                ✕
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="section-label mb-3">Weekly Split</div>
       <div className="grid gap-2">
         {DAYS.map((d) => {

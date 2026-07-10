@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, real } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, real, boolean, jsonb } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -47,6 +47,7 @@ export const workoutLogs = pgTable("workout_logs", {
   userId: integer("user_id").notNull(),
   date: text("date").notNull(), // ISO date
   workoutId: integer("workout_id").notNull(),
+  skipped: boolean("skipped").notNull().default(false), // no sets logged — excluded from progress graphs
 });
 
 export const setLogs = pgTable("set_logs", {
@@ -97,4 +98,19 @@ export const personalRecords = pgTable("personal_records", {
   weight: real("weight").notNull(),
   reps: integer("reps").notNull(),
   date: text("date").notNull(),
+});
+
+export type ProgramExercise = { name: string; sets: number; repMin: number; repMax: number; restSeconds: number | null };
+export type ProgramWorkout = { name: string; exercises: ProgramExercise[] };
+export type ProgramData = {
+  schedule: { day: string; workoutType: string; category: string | null }[];
+  workouts: ProgramWorkout[];
+};
+
+export const programs = pgTable("programs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  name: text("name").notNull(),
+  data: jsonb("data").$type<ProgramData>().notNull(),
+  createdAt: text("created_at").notNull(),
 });
