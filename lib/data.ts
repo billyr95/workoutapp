@@ -7,6 +7,8 @@ export async function getUser(userId: number) {
   return {
     id: u.id,
     email: u.email,
+    username: u.username,
+    avatarUrl: u.avatarUrl,
     name: u.name,
     heightFeet: u.heightFeet,
     heightInches: u.heightInches,
@@ -17,6 +19,10 @@ export async function getUser(userId: number) {
     protein: u.protein,
     carbs: u.carbs,
     fat: u.fat,
+    showWeight: u.showWeight,
+    showProgram: u.showProgram,
+    showMaxes: u.showMaxes,
+    showWorkoutDays: u.showWorkoutDays,
   };
 }
 

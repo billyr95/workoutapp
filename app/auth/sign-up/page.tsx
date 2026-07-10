@@ -8,6 +8,7 @@ import Link from "next/link";
 export default function SignUpPage() {
   const router = useRouter();
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +22,7 @@ export default function SignUpPage() {
     const res = await fetch("/api/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
+      body: JSON.stringify({ name, username, email, password }),
     });
     const json = await res.json();
     if (!res.ok) {
@@ -50,6 +51,16 @@ export default function SignUpPage() {
         <form onSubmit={handleSubmit} className="card">
           <div className="mb-3">
             <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required />
+          </div>
+          <div className="mb-3">
+            <input
+              placeholder="Username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value.toLowerCase())}
+              required
+              pattern="[a-z0-9_]{3,20}"
+              title="3-20 characters: lowercase letters, numbers, underscores"
+            />
           </div>
           <div className="mb-3">
             <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />

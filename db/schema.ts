@@ -5,6 +5,8 @@ export const users = pgTable("users", {
   // nullable: legacy/unclaimed profile rows (pre-auth data) have no login yet
   email: text("email").unique(),
   passwordHash: text("password_hash"),
+  username: text("username").unique(),
+  avatarUrl: text("avatar_url"),
   name: text("name").notNull(),
   heightFeet: integer("height_feet").notNull(),
   heightInches: integer("height_inches").notNull(),
@@ -15,6 +17,18 @@ export const users = pgTable("users", {
   protein: integer("protein").notNull(),
   carbs: integer("carbs").notNull(),
   fat: integer("fat").notNull(),
+  // public-profile visibility — private (false) by default until the user opts in
+  showWeight: boolean("show_weight").notNull().default(false),
+  showProgram: boolean("show_program").notNull().default(false),
+  showMaxes: boolean("show_maxes").notNull().default(false),
+  showWorkoutDays: boolean("show_workout_days").notNull().default(false),
+});
+
+export const follows = pgTable("follows", {
+  id: serial("id").primaryKey(),
+  followerId: integer("follower_id").notNull(),
+  followingId: integer("following_id").notNull(),
+  createdAt: text("created_at").notNull(),
 });
 
 export const schedule = pgTable("schedule", {

@@ -24,17 +24,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const valid = await compare(password, user.passwordHash);
         if (!valid) return null;
 
-        return { id: String(user.id), email: user.email, name: user.name };
+        return { id: String(user.id), email: user.email, name: user.name, username: user.username };
       },
     }),
   ],
   callbacks: {
     jwt({ token, user }) {
-      if (user) token.userId = user.id;
+      if (user) {
+        token.userId = user.id;
+        token.username = (user as { username: string | null }).username;
+      }
       return token;
     },
     session({ session, token }) {
-      if (session.user) session.user.id = token.userId as string;
+      if (session.user) {
+        session.user.id = token.userId as string;
+        session.user.username = (token.username as string | null) ?? null;
+      }
       return session;
     },
   },

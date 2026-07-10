@@ -51,6 +51,8 @@ export type AppData = {
   user: {
     id: number;
     email: string | null;
+    username: string | null;
+    avatarUrl: string | null;
     name: string;
     heightFeet: number;
     heightInches: number;
@@ -61,6 +63,10 @@ export type AppData = {
     protein: number;
     carbs: number;
     fat: number;
+    showWeight: boolean;
+    showProgram: boolean;
+    showMaxes: boolean;
+    showWorkoutDays: boolean;
   };
   schedule: ScheduleDay[];
   workouts: Workout[];
