@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
+type WorkoutDaySet = { exerciseName: string; setNumber: number; weight: number; reps: number };
+type WorkoutDay = { date: string; workoutName: string; skipped: boolean; sets: WorkoutDaySet[] };
+
 type PublicProfile = {
   id: number;
   username: string | null;
@@ -18,13 +21,27 @@ type PublicProfile = {
     workouts: { name: string; exercises: { name: string; sets: number; repMin: number; repMax: number; restSeconds: number | null }[] }[];
   } | null;
   maxes: { exerciseName: string; weight: number; reps: number; date: string }[] | null;
-  workoutDays: { date: string; workoutName: string; skipped: boolean }[] | null;
+  workoutDays: WorkoutDay[] | null;
 };
+
+function groupSetsByExercise(sets: WorkoutDaySet[]) {
+  const order: string[] = [];
+  const byExercise = new Map<string, WorkoutDaySet[]>();
+  for (const s of sets) {
+    if (!byExercise.has(s.exerciseName)) {
+      byExercise.set(s.exerciseName, []);
+      order.push(s.exerciseName);
+    }
+    byExercise.get(s.exerciseName)!.push(s);
+  }
+  return order.map((name) => ({ name, sets: byExercise.get(name)! }));
+}
 
 export default function PublicProfilePage() {
   const params = useParams<{ username: string }>();
   const [profile, setProfile] = useState<PublicProfile | null | "not-found">(null);
   const [followBusy, setFollowBusy] = useState(false);
+  const [expandedDay, setExpandedDay] = useState<number | null>(null);
 
   useEffect(() => {
     fetch(`/api/users/${params.username}`).then(async (res) => {
@@ -95,6 +112,44 @@ export default function PublicProfilePage() {
         </div>
       )}
 
+      {profile.workoutDays && profile.workoutDays.length > 0 && (
+        <>
+          <div className="section-label mb-3">Workout History</div>
+          <div className="mb-4">
+            {profile.workoutDays.map((d, i) => {
+              const isOpen = expandedDay === i;
+              const hasSets = d.sets.length > 0;
+              return (
+                <div key={i} className="card !py-3 !px-4 mb-2">
+                  <button
+                    className="flex justify-between w-full text-left"
+                    onClick={() => hasSets && setExpandedDay(isOpen ? null : i)}
+                  >
+                    <span className="font-mono text-xs">{d.date}</span>
+                    <span className="font-mono text-xs text-[var(--chalk-dim)] flex items-center gap-1.5">
+                      {d.skipped ? <span className="text-[var(--muted)]">Skipped · {d.workoutName}</span> : d.workoutName}
+                      {hasSets && <span className="text-[var(--muted)]">{isOpen ? "▲" : "▼"}</span>}
+                    </span>
+                  </button>
+                  {isOpen && hasSets && (
+                    <div className="mt-2.5 pt-2.5 border-t border-[var(--line)]">
+                      {groupSetsByExercise(d.sets).map((ex) => (
+                        <div key={ex.name} className="flex justify-between mb-1 last:mb-0">
+                          <span className="font-mono text-[12px]">{ex.name}</span>
+                          <span className="font-mono text-[11px] text-[var(--chalk-dim)]">
+                            {ex.sets.map((s) => `${s.weight}×${s.reps}`).join(", ")}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
       {profile.weight && (
         <>
           <div className="section-label mb-3">Current Weight</div>
@@ -148,20 +203,6 @@ export default function PublicProfilePage() {
               );
             })}
           </div>
-        </>
-      )}
-
-      {profile.workoutDays && profile.workoutDays.length > 0 && (
-        <>
-          <div className="section-label mb-3">Workout History</div>
-          {profile.workoutDays.map((d, i) => (
-            <div key={i} className="card !py-3 !px-4 flex justify-between mb-2">
-              <span className="font-mono text-xs">{d.date}</span>
-              <span className="font-mono text-xs text-[var(--chalk-dim)]">
-                {d.skipped ? <span className="text-[var(--muted)]">Skipped · {d.workoutName}</span> : d.workoutName}
-              </span>
-            </div>
-          ))}
         </>
       )}
     </div>

@@ -30,7 +30,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ username
     weight: { value: number; date: string } | null;
     program: Awaited<ReturnType<typeof buildProgram>> | null;
     maxes: { exerciseName: string; weight: number; reps: number; date: string }[] | null;
-    workoutDays: { date: string; workoutName: string; skipped: boolean }[] | null;
+    workoutDays:
+      | {
+          date: string;
+          workoutName: string;
+          skipped: boolean;
+          sets: { exerciseName: string; setNumber: number; weight: number; reps: number }[];
+        }[]
+      | null;
   } = {
     id: target.id,
     username: target.username,
@@ -66,12 +73,29 @@ export async function GET(req: Request, { params }: { params: Promise<{ username
   if (target.showWorkoutDays) {
     const logs = await db.select().from(schema.workoutLogs);
     const workouts = await db.select().from(schema.workouts);
+    const exercises = await db.select().from(schema.exercises);
+    const allSets = await db.select().from(schema.setLogs);
     const workoutNameById = new Map(workouts.map((w) => [w.id, w.name]));
+    const exerciseNameById = new Map(exercises.map((e) => [e.id, e.name]));
+
     profile.workoutDays = logs
       .filter((l) => l.userId === target.id)
       .sort((a, b) => b.date.localeCompare(a.date))
       .slice(0, 20)
-      .map((l) => ({ date: l.date, workoutName: workoutNameById.get(l.workoutId) ?? "Workout", skipped: l.skipped }));
+      .map((l) => ({
+        date: l.date,
+        workoutName: workoutNameById.get(l.workoutId) ?? "Workout",
+        skipped: l.skipped,
+        sets: allSets
+          .filter((s) => s.workoutLogId === l.id)
+          .sort((a, b) => a.setNumber - b.setNumber)
+          .map((s) => ({
+            exerciseName: exerciseNameById.get(s.exerciseId) ?? "Exercise",
+            setNumber: s.setNumber,
+            weight: s.weight,
+            reps: s.reps,
+          })),
+      }));
   }
 
   return NextResponse.json(profile);
