@@ -5,16 +5,34 @@ import { useAppData } from "@/lib/useAppData";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
+type DayType = "Rest" | "Cardio" | "Workout";
+type DayForm = { type: DayType; name: string; category: "Strength" | "Hypertrophy" };
+
+function dayFormFor(sched: { workoutType: string; category: string | null } | undefined): DayForm {
+  if (!sched || sched.workoutType === "Rest") return { type: "Rest", name: "", category: "Strength" };
+  if (sched.workoutType === "Cardio") return { type: "Cardio", name: "", category: "Strength" };
+  return { type: "Workout", name: sched.workoutType, category: (sched.category as "Strength" | "Hypertrophy") || "Strength" };
+}
+
 export default function SchedulePage() {
   const { data, loading, refetch } = useAppData();
   const [editingDay, setEditingDay] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", sets: "", repMin: "", repMax: "" });
+  const [dayForm, setDayForm] = useState<DayForm>({ type: "Rest", name: "", category: "Strength" });
+  const [savingDay, setSavingDay] = useState(false);
+
+  const editingSched = data && editingDay ? data.schedule.find((s) => s.day === editingDay) : null;
+  const editingWorkout = data && editingSched ? data.workouts.find((w) => w.name === editingSched.workoutType) : null;
+  const isConfigurableWorkout = !!(editingSched?.category && editingWorkout);
 
   if (loading || !data) return <p className="font-mono text-sm text-[var(--muted)]">Loading…</p>;
 
   const today = DAYS[new Date().getDay()];
-  const editingSched = editingDay ? data.schedule.find((s) => s.day === editingDay) : null;
-  const editingWorkout = editingSched ? data.workouts.find((w) => w.name === editingSched.workoutType) : null;
+
+  function selectDay(d: string) {
+    setEditingDay(d);
+    setDayForm(dayFormFor(data!.schedule.find((s) => s.day === d)));
+  }
 
   async function addExercise() {
     if (!editingWorkout) return;
@@ -43,6 +61,24 @@ export default function SchedulePage() {
     await refetch();
   }
 
+  async function saveDay() {
+    if (!editingDay) return;
+    if (dayForm.type === "Workout" && !dayForm.name.trim()) return;
+    setSavingDay(true);
+    await fetch("/api/schedule", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        day: editingDay,
+        type: dayForm.type,
+        name: dayForm.name,
+        category: dayForm.category,
+      }),
+    });
+    setSavingDay(false);
+    await refetch();
+  }
+
   return (
     <div>
       <div className="section-label mb-3">Weekly Split</div>
@@ -53,7 +89,7 @@ export default function SchedulePage() {
           return (
             <button
               key={d}
-              onClick={() => setEditingDay(d)}
+              onClick={() => selectDay(d)}
               className={`flex justify-between items-center card !py-3 !px-3.5 text-left ${d === (editingDay ?? today) ? "!border-[var(--red)]" : ""}`}
             >
               <span className="font-display text-lg w-24">{d}</span>
@@ -66,7 +102,49 @@ export default function SchedulePage() {
       {editingDay && (
         <div className="mt-6">
           <div className="section-label mb-3">Editing — {editingDay}</div>
-          {editingSched?.category && editingWorkout ? (
+
+          <div className="card mb-3">
+            <div className="flex gap-2 mb-3">
+              {(["Rest", "Cardio", "Workout"] as DayType[]).map((t) => (
+                <button
+                  key={t}
+                  className={`btn-ghost !py-1.5 !px-3 !text-[11px] rounded flex-1 ${dayForm.type === t ? "!border-[var(--red)] !text-[var(--chalk)]" : ""}`}
+                  onClick={() => setDayForm({ ...dayForm, type: t })}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+
+            {dayForm.type === "Workout" && (
+              <div className="flex gap-2 mb-1">
+                <input
+                  placeholder="Workout name (e.g. Upper A)"
+                  value={dayForm.name}
+                  onChange={(e) => setDayForm({ ...dayForm, name: e.target.value })}
+                />
+                <select
+                  value={dayForm.category}
+                  onChange={(e) => setDayForm({ ...dayForm, category: e.target.value as "Strength" | "Hypertrophy" })}
+                  className="max-w-[140px]"
+                >
+                  <option value="Strength">Strength</option>
+                  <option value="Hypertrophy">Hypertrophy</option>
+                </select>
+              </div>
+            )}
+            {dayForm.type === "Workout" && (
+              <p className="font-mono text-[10px] text-[var(--muted)] mb-2">
+                Reuses one of your existing workouts if the name matches exactly.
+              </p>
+            )}
+
+            <button className="btn !py-1.5 !px-3 !text-[11px] mt-1" onClick={saveDay} disabled={savingDay}>
+              {savingDay ? "Saving…" : "Save Day"}
+            </button>
+          </div>
+
+          {isConfigurableWorkout && editingWorkout ? (
             <div className="card">
               <div className="font-display text-xl mb-2">{editingWorkout.name}</div>
               {editingWorkout.exercises.map((ex) => (
@@ -95,12 +173,7 @@ export default function SchedulePage() {
               </div>
             </div>
           ) : (
-            <div>
-              <div className="card text-center text-[var(--muted)] font-mono text-xs">
-                {editingSched ? editingSched.workoutType : "Rest"} day — nothing to edit.
-              </div>
-              <button className="btn-ghost !py-1.5 !px-3 !text-[11px] rounded mt-2.5" onClick={() => setEditingDay(null)}>Close</button>
-            </div>
+            <button className="btn-ghost !py-1.5 !px-3 !text-[11px] rounded" onClick={() => setEditingDay(null)}>Close</button>
           )}
         </div>
       )}

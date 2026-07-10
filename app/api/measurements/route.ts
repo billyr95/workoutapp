@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { USER_ID } from "@/lib/data";
+import { auth } from "@/auth";
 
 // body: { date?, waist?, chest?, leftArm?, rightArm?, leftThigh?, rightThigh?, neck? }
 export async function POST(req: Request) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = Number(session.user.id);
+
   const body = await req.json();
   const date = body.date || new Date().toISOString().slice(0, 10);
 
   const allMeasurements = await db.select().from(schema.measurements);
-  const existing = allMeasurements.find((m) => m.userId === USER_ID && m.date === date);
+  const existing = allMeasurements.find((m) => m.userId === userId && m.date === date);
 
   const values = {
     waist: body.waist ?? null,
@@ -24,7 +28,7 @@ export async function POST(req: Request) {
   if (existing) {
     await db.update(schema.measurements).set(values).where(eq(schema.measurements.id, existing.id));
   } else {
-    await db.insert(schema.measurements).values({ userId: USER_ID, date, ...values });
+    await db.insert(schema.measurements).values({ userId, date, ...values });
   }
 
   return NextResponse.json({ ok: true });

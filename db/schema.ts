@@ -2,6 +2,9 @@ import { pgTable, serial, text, integer, real } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
+  // nullable: legacy/unclaimed profile rows (pre-auth data) have no login yet
+  email: text("email").unique(),
+  passwordHash: text("password_hash"),
   name: text("name").notNull(),
   heightFeet: integer("height_feet").notNull(),
   heightInches: integer("height_inches").notNull(),

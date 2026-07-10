@@ -49,6 +49,7 @@ export type WorkoutLog = {
 export type AppData = {
   user: {
     id: number;
+    email: string | null;
     name: string;
     heightFeet: number;
     heightInches: number;
