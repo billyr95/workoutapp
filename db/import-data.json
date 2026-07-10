@@ -1,0 +1,99 @@
+{
+  "user": {
+    "id": "user_001",
+    "name": "Billy",
+    "height": {
+      "feet": 6,
+      "inches": 3
+    },
+    "weight": {
+      "current": 194.2,
+      "goal": 185
+    },
+    "goal": "Lean athletic physique (Fight Club Brad Pitt)",
+    "macros": {
+      "calories": 2400,
+      "protein": 190,
+      "carbs": 220,
+      "fat": 70
+    }
+  },
+
+  "weeklySchedule": [
+    { "day": "Monday", "workoutId": "upperA" },
+    { "day": "Tuesday", "workoutId": "lowerA" },
+    { "day": "Wednesday", "workoutId": "cardioA" },
+    { "day": "Thursday", "workoutId": "upperB" },
+    { "day": "Friday", "workoutId": "lowerB" },
+    { "day": "Saturday", "workoutId": "cardioB" },
+    { "day": "Sunday", "workoutId": "rest" }
+  ],
+
+  "workouts": [
+    {
+      "id": "upperA",
+      "name": "Upper A",
+      "category": "Strength",
+      "exercises": [
+        { "id": "bench", "name": "Bench Press", "sets": 4, "minReps": 5, "maxReps": 8, "rest": 120 },
+        { "id": "pullups", "name": "Pull-ups", "sets": 4, "minReps": 6, "maxReps": 10, "rest": 90 },
+        { "id": "inclineDB", "name": "Incline Dumbbell Bench", "sets": 3, "minReps": 8, "maxReps": 10 },
+        { "id": "csr", "name": "Chest Supported Row", "sets": 3, "minReps": 8, "maxReps": 10 },
+        { "id": "ohp", "name": "Standing Overhead Press", "sets": 3, "minReps": 6, "maxReps": 8 },
+        { "id": "laterals", "name": "Lateral Raises", "sets": 3, "minReps": 15, "maxReps": 15 },
+        { "id": "legraises", "name": "Hanging Leg Raises", "sets": 3, "minReps": 12, "maxReps": 15 }
+      ]
+    },
+    {
+      "id": "lowerA",
+      "name": "Lower A",
+      "category": "Strength",
+      "exercises": [
+        { "name": "Back Squat", "sets": 4, "minReps": 5, "maxReps": 8 },
+        { "name": "Romanian Deadlift", "sets": 3, "minReps": 8, "maxReps": 10 },
+        { "name": "Bulgarian Split Squat", "sets": 3, "minReps": 10, "maxReps": 10 },
+        { "name": "Standing Calf Raise", "sets": 3, "minReps": 15, "maxReps": 15 },
+        { "name": "Ab Wheel", "sets": 3, "minReps": 10, "maxReps": 10 }
+      ]
+    },
+    {
+      "id": "upperB",
+      "name": "Upper B",
+      "category": "Hypertrophy",
+      "exercises": [
+        { "name": "Incline Bench Press", "sets": 3, "minReps": 8, "maxReps": 12 },
+        { "name": "Lat Pulldown", "sets": 3, "minReps": 8, "maxReps": 12 },
+        { "name": "Seated Cable Row", "sets": 3, "minReps": 10, "maxReps": 12 },
+        { "name": "Dumbbell Shoulder Press", "sets": 3, "minReps": 10, "maxReps": 12 },
+        { "name": "Lateral Raises", "sets": 4, "minReps": 15, "maxReps": 20 },
+        { "name": "Face Pulls", "sets": 3, "minReps": 15, "maxReps": 20 },
+        { "name": "EZ Bar Curl", "sets": 3, "minReps": 10, "maxReps": 12 },
+        { "name": "Rope Pushdown", "sets": 3, "minReps": 10, "maxReps": 12 }
+      ]
+    },
+    {
+      "id": "lowerB",
+      "name": "Lower B",
+      "category": "Hypertrophy",
+      "exercises": [
+        { "name": "Front Squat", "sets": 3, "minReps": 8, "maxReps": 10 },
+        { "name": "Romanian Deadlift", "sets": 3, "minReps": 8, "maxReps": 10 },
+        { "name": "Walking Lunges", "sets": 3, "minReps": 12, "maxReps": 12 },
+        { "name": "Box Jumps", "sets": 3, "minReps": 5, "maxReps": 5 },
+        { "name": "Farmer Carries", "sets": 3, "duration": "40m" },
+        { "name": "Cable Crunches", "sets": 3, "minReps": 15, "maxReps": 15 }
+      ]
+    },
+    { "id": "cardioA", "name": "Recovery Cardio", "activity": "Stationary Bike", "durationMinutes": 30 },
+    { "id": "cardioB", "name": "Endurance Cardio", "activity": "Stationary Bike", "durationMinutes": 45 }
+  ],
+
+  "logs": {
+    "weight": [
+      { "date": "2026-07-09", "weight": 194.2 }
+    ],
+    "measurements": [
+      { "date": "2026-07-09", "waist": 32, "chest": null, "arms": null, "thighs": null, "neck": null }
+    ]
+  }
+}

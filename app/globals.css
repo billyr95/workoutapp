@@ -1,0 +1,104 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  --bg: #17181a;
+  --surface: #1f2124;
+  --surface2: #26282b;
+  --line: #37393d;
+  --chalk: #e9e4d8;
+  --chalk-dim: #a9a49a;
+  --red: #c8102e;
+  --red-dim: #6e1420;
+  --olive: #6a7f57;
+  --muted: #74777c;
+
+  /* categorical series palette — dark-surface validated, fixed order, never cycled per-selection */
+  --series-1: #3987e5; /* blue */
+  --series-2: #199e70; /* aqua */
+  --series-3: #c98500; /* yellow */
+  --series-4: #008300; /* green */
+  --series-5: #9085e9; /* violet */
+  --series-6: #e66767; /* red */
+  --series-7: #d55181; /* magenta */
+  --series-8: #d95926; /* orange */
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--chalk);
+  font-family: 'Inter', sans-serif;
+}
+
+.font-display {
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.font-mono {
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+input, select, textarea {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  color: var(--chalk);
+  border-radius: 4px;
+  padding: 8px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  width: 100%;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--red);
+}
+input::placeholder { color: var(--muted); }
+
+.btn {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--red);
+  color: #17181a;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: filter 0.15s;
+}
+.btn:hover { filter: brightness(1.12); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-ghost {
+  background: transparent;
+  color: var(--chalk-dim);
+  border: 1px solid var(--line);
+}
+.btn-ghost:hover { color: var(--chalk); border-color: var(--chalk-dim); }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.section-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--red);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}

@@ -1,0 +1,10 @@
+{
+  "name": "Billy's Training Log",
+  "short_name": "Training Log",
+  "description": "Workout, cardio, and progress tracker",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#17181a",
+  "theme_color": "#c8102e",
+  "icons": []
+}
