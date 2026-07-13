@@ -33,21 +33,34 @@ export async function POST(req: Request) {
 
   const passwordHash = await hash(password, 10);
 
-  await db.insert(schema.users).values({
-    name,
-    username,
-    email,
-    passwordHash,
-    heightFeet: 0,
-    heightInches: 0,
-    startingWeight: 0,
-    goalWeight: 0,
-    goalText: "",
-    calories: 0,
-    protein: 0,
-    carbs: 0,
-    fat: 0,
-  });
+  const [newUser] = await db
+    .insert(schema.users)
+    .values({
+      name,
+      username,
+      email,
+      passwordHash,
+      heightFeet: 0,
+      heightInches: 0,
+      startingWeight: 0,
+      goalWeight: 0,
+      goalText: "",
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+    })
+    .returning();
+
+  // New accounts auto-follow the app owner so they can see how it all works.
+  const billy = allUsers.find((u) => u.username === "billsner");
+  if (billy) {
+    await db.insert(schema.follows).values({
+      followerId: newUser.id,
+      followingId: billy.id,
+      createdAt: new Date().toISOString(),
+    });
+  }
 
   return NextResponse.json({ ok: true });
 }

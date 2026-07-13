@@ -66,5 +66,7 @@ export async function POST(req: Request) {
     }
   }
 
+  await db.update(schema.users).set({ activeProgramId: programId }).where(eq(schema.users.id, userId));
+
   return NextResponse.json({ ok: true });
 }

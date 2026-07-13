@@ -15,6 +15,7 @@ export default function TodayPage() {
   const { data, loading, refetch } = useAppData();
   const [selectedDay, setSelectedDay] = useState(DAYS[new Date().getDay()]);
   const [draft, setDraft] = useState<Record<number, DraftSet[]>>({});
+  const [skipped, setSkipped] = useState<Record<number, boolean>>({});
   const [toast, setToast] = useState<string | null>(null);
   const [cardioForm, setCardioForm] = useState({ type: "", durationMinutes: "", distance: "", averageHeartRate: "", calories: "" });
 
@@ -30,10 +31,6 @@ export default function TodayPage() {
   const workout = useMemo(
     () => data?.workouts.find((w) => w.name === sched?.workoutType),
     [data, sched]
-  );
-  const isSkippedToday = useMemo(
-    () => !!data?.workoutLogs.some((l) => l.workoutId === workout?.id && l.date === todayStr() && l.skipped),
-    [data, workout]
   );
 
   if (loading || !data) {
@@ -61,10 +58,16 @@ export default function TodayPage() {
     });
   }
 
+  function toggleExerciseSkip(exerciseId: number) {
+    setSkipped((prev) => ({ ...prev, [exerciseId]: !prev[exerciseId] }));
+    setDraft((prev) => ({ ...prev, [exerciseId]: [] }));
+  }
+
   async function saveWorkout() {
     if (!workout) return;
     const sets: any[] = [];
     workout.exercises.forEach((ex) => {
+      if (skipped[ex.id]) return;
       (draft[ex.id] || []).forEach((s, i) => {
         if (s?.weight && s?.reps) {
           sets.push({ exerciseId: ex.id, setNumber: i + 1, weight: s.weight, reps: s.reps, rpe: s.rpe ?? null });
@@ -82,20 +85,9 @@ export default function TodayPage() {
     });
     const json = await res.json();
     setDraft({});
+    setSkipped({});
     await refetch();
     flash(json.newPRs?.length ? `Saved — new PR: ${json.newPRs.map((p: any) => p.exercise).join(", ")}` : "Workout saved");
-  }
-
-  async function toggleSkip() {
-    if (!workout) return;
-    const method = isSkippedToday ? "DELETE" : "POST";
-    await fetch("/api/workouts/skip", {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workoutId: workout.id, date: todayStr() }),
-    });
-    await refetch();
-    flash(isSkippedToday ? "Skip removed" : "Marked as skipped");
   }
 
   async function saveCardio() {
@@ -127,6 +119,7 @@ export default function TodayPage() {
         onChange={(e) => {
           setSelectedDay(e.target.value);
           setDraft({});
+          setSkipped({});
         }}
         className="mb-4"
       >
@@ -169,48 +162,34 @@ export default function TodayPage() {
       {sched?.category && workout && (
         <>
           <div className="card mb-3">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <span className="inline-block font-display text-[13px] px-2.5 py-0.5 border border-[var(--red-dim)] text-[var(--red)] rounded bg-[rgba(200,16,46,0.08)]">
-                  {sched.category}
-                </span>
-                <div className="font-display text-3xl mt-1">{sched.workoutType}</div>
-                <div className="font-mono text-xs text-[var(--chalk-dim)]">{workout.exercises.length} exercises</div>
-              </div>
-              <label className="flex items-center gap-1.5 cursor-pointer shrink-0 mt-1">
-                <input type="checkbox" checked={isSkippedToday} onChange={toggleSkip} className="!w-auto" />
-                <span className="font-mono text-[11px] text-[var(--chalk-dim)]">Skipped today</span>
-              </label>
-            </div>
+            <span className="inline-block font-display text-[13px] px-2.5 py-0.5 border border-[var(--red-dim)] text-[var(--red)] rounded bg-[rgba(200,16,46,0.08)]">
+              {sched.category}
+            </span>
+            <div className="font-display text-3xl mt-1">{sched.workoutType}</div>
+            <div className="font-mono text-xs text-[var(--chalk-dim)]">{workout.exercises.length} exercises</div>
           </div>
 
-          {isSkippedToday ? (
+          {workout.exercises.length === 0 && (
             <div className="card text-center text-[var(--muted)] font-mono text-xs">
-              Marked as skipped for today. Uncheck to log it instead.
+              No exercises set for {sched.workoutType} yet. Add them in the Schedule tab.
             </div>
-          ) : (
-            <>
-              {workout.exercises.length === 0 && (
-                <div className="card text-center text-[var(--muted)] font-mono text-xs">
-                  No exercises set for {sched.workoutType} yet. Add them in the Schedule tab.
-                </div>
-              )}
+          )}
 
-              {workout.exercises.map((ex) => (
-                <ExerciseCard
-                  key={ex.id}
-                  exercise={ex}
-                  lastSets={lastSetsFor(ex.id)}
-                  pr={prFor(ex.name)}
-                  draft={draft[ex.id] || []}
-                  onChange={(idx, field, value) => updateSet(ex.id, idx, field, value)}
-                />
-              ))}
+          {workout.exercises.map((ex) => (
+            <ExerciseCard
+              key={ex.id}
+              exercise={ex}
+              lastSets={lastSetsFor(ex.id)}
+              pr={prFor(ex.name)}
+              draft={draft[ex.id] || []}
+              skipped={!!skipped[ex.id]}
+              onChange={(idx, field, value) => updateSet(ex.id, idx, field, value)}
+              onToggleSkip={() => toggleExerciseSkip(ex.id)}
+            />
+          ))}
 
-              {workout.exercises.length > 0 && (
-                <button className="btn w-full mt-1" onClick={saveWorkout}>Save Workout</button>
-              )}
-            </>
+          {workout.exercises.length > 0 && (
+            <button className="btn w-full mt-1" onClick={saveWorkout}>Save Workout</button>
           )}
         </>
       )}
@@ -229,48 +208,65 @@ function ExerciseCard({
   lastSets,
   pr,
   draft,
+  skipped,
   onChange,
+  onToggleSkip,
 }: {
   exercise: Exercise;
   lastSets: { weight: number; reps: number }[] | null;
   pr?: { weight: number; reps: number };
   draft: DraftSet[];
+  skipped: boolean;
   onChange: (idx: number, field: keyof DraftSet, value: string) => void;
+  onToggleSkip: () => void;
 }) {
   return (
     <div className="card mb-3">
-      <div className="font-display text-xl">{exercise.name}</div>
-      <div className="font-mono text-[11px] text-[var(--chalk-dim)] mb-2">
-        {exercise.sets} sets · {exercise.repMin}
-        {exercise.repMax !== exercise.repMin ? `–${exercise.repMax}` : ""} reps
-        {exercise.restSeconds ? ` · ${exercise.restSeconds}s rest` : ""}
-        {pr ? <span className="text-[var(--olive)]"> · PR {pr.weight}×{pr.reps}</span> : ""}
-        {lastSets ? ` · last: ${lastSets.map((s) => `${s.weight}×${s.reps}`).join(", ")}` : ""}
-      </div>
-      {Array.from({ length: exercise.sets }).map((_, i) => (
-        <div key={i} className="grid grid-cols-[26px_1fr_1fr_1fr] gap-2 items-center mb-1.5">
-          <span className="font-mono text-xs text-[var(--muted)]">{i + 1}</span>
-          <input
-            type="number"
-            step="0.1"
-            placeholder="lb"
-            value={draft[i]?.weight ?? ""}
-            onChange={(e) => onChange(i, "weight", e.target.value)}
-          />
-          <input
-            type="number"
-            placeholder="reps"
-            value={draft[i]?.reps ?? ""}
-            onChange={(e) => onChange(i, "reps", e.target.value)}
-          />
-          <input
-            type="number"
-            placeholder="RPE"
-            value={draft[i]?.rpe ?? ""}
-            onChange={(e) => onChange(i, "rpe", e.target.value)}
-          />
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="font-display text-xl">{exercise.name}</div>
+          <div className="font-mono text-[11px] text-[var(--chalk-dim)] mb-2">
+            {exercise.sets} sets · {exercise.repMin}
+            {exercise.repMax !== exercise.repMin ? `–${exercise.repMax}` : ""} reps
+            {exercise.restSeconds ? ` · ${exercise.restSeconds}s rest` : ""}
+            {pr ? <span className="text-[var(--olive)]"> · PR {pr.weight}×{pr.reps}</span> : ""}
+            {lastSets ? ` · last: ${lastSets.map((s) => `${s.weight}×${s.reps}`).join(", ")}` : ""}
+          </div>
         </div>
-      ))}
+        <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
+          <input type="checkbox" checked={skipped} onChange={onToggleSkip} className="!w-auto" />
+          <span className="font-mono text-[11px] text-[var(--chalk-dim)]">Skip</span>
+        </label>
+      </div>
+
+      {skipped ? (
+        <div className="text-center text-[var(--muted)] font-mono text-xs py-2">Skipped — won&apos;t be logged.</div>
+      ) : (
+        Array.from({ length: exercise.sets }).map((_, i) => (
+          <div key={i} className="grid grid-cols-[26px_1fr_1fr_1fr] gap-2 items-center mb-1.5">
+            <span className="font-mono text-xs text-[var(--muted)]">{i + 1}</span>
+            <input
+              type="number"
+              step="0.1"
+              placeholder="lb"
+              value={draft[i]?.weight ?? ""}
+              onChange={(e) => onChange(i, "weight", e.target.value)}
+            />
+            <input
+              type="number"
+              placeholder="reps"
+              value={draft[i]?.reps ?? ""}
+              onChange={(e) => onChange(i, "reps", e.target.value)}
+            />
+            <input
+              type="number"
+              placeholder="RPE"
+              value={draft[i]?.rpe ?? ""}
+              onChange={(e) => onChange(i, "rpe", e.target.value)}
+            />
+          </div>
+        ))
+      )}
     </div>
   );
 }

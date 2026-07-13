@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { auth } from "@/auth";
+import { getProgramSnapshot } from "@/lib/data";
 
 export async function GET(req: Request, { params }: { params: Promise<{ username: string }> }) {
   const session = await auth();
@@ -28,13 +29,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ username
     followerCount: number;
     followingCount: number;
     weight: { value: number; date: string } | null;
-    program: Awaited<ReturnType<typeof buildProgram>> | null;
+    program: Awaited<ReturnType<typeof getProgramSnapshot>> | null;
     maxes: { exerciseName: string; weight: number; reps: number; date: string }[] | null;
     workoutDays:
       | {
           date: string;
           workoutName: string;
-          skipped: boolean;
           sets: { exerciseName: string; setNumber: number; weight: number; reps: number }[];
         }[]
       | null;
@@ -60,7 +60,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ username
   }
 
   if (target.showProgram) {
-    profile.program = await buildProgram(target.id);
+    profile.program = await getProgramSnapshot(target.id);
   }
 
   if (target.showMaxes) {
@@ -85,7 +85,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ username
       .map((l) => ({
         date: l.date,
         workoutName: workoutNameById.get(l.workoutId) ?? "Workout",
-        skipped: l.skipped,
         sets: allSets
           .filter((s) => s.workoutLogId === l.id)
           .sort((a, b) => a.setNumber - b.setNumber)
@@ -99,27 +98,4 @@ export async function GET(req: Request, { params }: { params: Promise<{ username
   }
 
   return NextResponse.json(profile);
-}
-
-async function buildProgram(userId: number) {
-  const scheduleRows = await db.select().from(schema.schedule);
-  const workoutRows = await db.select().from(schema.workouts);
-  const exerciseRows = await db.select().from(schema.exercises);
-
-  const workouts = workoutRows
-    .filter((w) => w.userId === userId)
-    .map((w) => ({
-      name: w.name,
-      exercises: exerciseRows
-        .filter((e) => e.workoutId === w.id)
-        .sort((a, b) => a.sortOrder - b.sortOrder)
-        .map((e) => ({ name: e.name, sets: e.sets, repMin: e.repMin, repMax: e.repMax, restSeconds: e.restSeconds })),
-    }));
-
-  return {
-    schedule: scheduleRows
-      .filter((s) => s.userId === userId)
-      .map((s) => ({ day: s.day, workoutType: s.workoutType, category: s.category })),
-    workouts,
-  };
 }

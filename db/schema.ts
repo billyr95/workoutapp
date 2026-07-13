@@ -22,6 +22,8 @@ export const users = pgTable("users", {
   showProgram: boolean("show_program").notNull().default(false),
   showMaxes: boolean("show_maxes").notNull().default(false),
   showWorkoutDays: boolean("show_workout_days").notNull().default(false),
+  // the saved program (if any) currently loaded onto the live schedule
+  activeProgramId: integer("active_program_id"),
 });
 
 export const follows = pgTable("follows", {
@@ -61,7 +63,6 @@ export const workoutLogs = pgTable("workout_logs", {
   userId: integer("user_id").notNull(),
   date: text("date").notNull(), // ISO date
   workoutId: integer("workout_id").notNull(),
-  skipped: boolean("skipped").notNull().default(false), // no sets logged — excluded from progress graphs
 });
 
 export const setLogs = pgTable("set_logs", {

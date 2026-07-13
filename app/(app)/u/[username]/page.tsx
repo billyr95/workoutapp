@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
 type WorkoutDaySet = { exerciseName: string; setNumber: number; weight: number; reps: number };
-type WorkoutDay = { date: string; workoutName: string; skipped: boolean; sets: WorkoutDaySet[] };
+type WorkoutDay = { date: string; workoutName: string; sets: WorkoutDaySet[] };
 
 type PublicProfile = {
   id: number;
@@ -42,6 +42,13 @@ export default function PublicProfilePage() {
   const [profile, setProfile] = useState<PublicProfile | null | "not-found">(null);
   const [followBusy, setFollowBusy] = useState(false);
   const [expandedDay, setExpandedDay] = useState<number | null>(null);
+  const [savingProgram, setSavingProgram] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const flash = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2200);
+  };
 
   useEffect(() => {
     fetch(`/api/users/${params.username}`).then(async (res) => {
@@ -73,6 +80,19 @@ export default function PublicProfilePage() {
         : prev
     );
     setFollowBusy(false);
+  }
+
+  async function saveProgram() {
+    if (profile === null || profile === "not-found" || !profile.username) return;
+    setSavingProgram(true);
+    const res = await fetch("/api/programs/save-from-user", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: profile.username }),
+    });
+    const json = await res.json();
+    setSavingProgram(false);
+    flash(res.ok ? "Saved — find it in your Programs dropdown on the Schedule page" : json.error || "Couldn't save program");
   }
 
   const nothingShared = !profile.weight && !profile.program && !profile.maxes && !profile.workoutDays;
@@ -127,7 +147,7 @@ export default function PublicProfilePage() {
                   >
                     <span className="font-mono text-xs">{d.date}</span>
                     <span className="font-mono text-xs text-[var(--chalk-dim)] flex items-center gap-1.5">
-                      {d.skipped ? <span className="text-[var(--muted)]">Skipped · {d.workoutName}</span> : d.workoutName}
+                      {d.workoutName}
                       {hasSets && <span className="text-[var(--muted)]">{isOpen ? "▲" : "▼"}</span>}
                     </span>
                   </button>
@@ -176,7 +196,18 @@ export default function PublicProfilePage() {
 
       {profile.program && profile.program.schedule.length > 0 && (
         <>
-          <div className="section-label mb-3 mt-4">Workout Program</div>
+          <div className="section-label mb-3 mt-4 flex items-center justify-between !gap-3">
+            <span>Workout Program</span>
+            {!profile.isSelf && profile.isFollowing && (
+              <button
+                className="btn-ghost !py-1 !px-2.5 !text-[11px] normal-case tracking-normal rounded shrink-0"
+                onClick={saveProgram}
+                disabled={savingProgram}
+              >
+                {savingProgram ? "Saving…" : "Save Their Program"}
+              </button>
+            )}
+          </div>
           <div className="grid gap-2 mb-4">
             {profile.program.schedule.map((s) => {
               const workout = profile.program!.workouts.find((w) => w.name === s.workoutType);
@@ -204,6 +235,12 @@ export default function PublicProfilePage() {
             })}
           </div>
         </>
+      )}
+
+      {toast && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-[var(--olive)] text-[#101410] font-mono text-xs px-4 py-2.5 rounded-md z-50">
+          {toast}
+        </div>
       )}
     </div>
   );

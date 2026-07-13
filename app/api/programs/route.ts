@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { auth } from "@/auth";
-import { getSchedule, getWorkoutsWithExercises } from "@/lib/data";
-import type { ProgramData } from "@/db/schema";
+import { getProgramSnapshot } from "@/lib/data";
 
 export async function GET() {
   const session = await auth();
@@ -29,27 +28,15 @@ export async function POST(req: Request) {
   const name = typeof body.name === "string" ? body.name.trim() : "";
   if (!name) return NextResponse.json({ error: "Program name is required" }, { status: 400 });
 
-  const schedule = await getSchedule(userId);
-  const workouts = await getWorkoutsWithExercises(userId);
-
-  const data: ProgramData = {
-    schedule: schedule.map((s) => ({ day: s.day, workoutType: s.workoutType, category: s.category })),
-    workouts: workouts.map((w) => ({
-      name: w.name,
-      exercises: w.exercises.map((e) => ({
-        name: e.name,
-        sets: e.sets,
-        repMin: e.repMin,
-        repMax: e.repMax,
-        restSeconds: e.restSeconds,
-      })),
-    })),
-  };
+  const data = await getProgramSnapshot(userId);
 
   const [row] = await db
     .insert(schema.programs)
     .values({ userId, name, data, createdAt: new Date().toISOString() })
     .returning();
+
+  // Saving your current setup means that's the program you're now "on."
+  await db.update(schema.users).set({ activeProgramId: row.id }).where(eq(schema.users.id, userId));
 
   return NextResponse.json({ id: row.id, name: row.name, createdAt: row.createdAt });
 }
@@ -68,5 +55,11 @@ export async function DELETE(req: Request) {
   if (!program || program.userId !== userId) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   await db.delete(schema.programs).where(eq(schema.programs.id, id));
+
+  const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
+  if (user?.activeProgramId === id) {
+    await db.update(schema.users).set({ activeProgramId: null }).where(eq(schema.users.id, userId));
+  }
+
   return NextResponse.json({ ok: true });
 }

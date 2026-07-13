@@ -1,4 +1,5 @@
 import { db, schema } from "@/db";
+import type { ProgramData } from "@/db/schema";
 
 export async function getUser(userId: number) {
   const rows = await db.select().from(schema.users);
@@ -23,6 +24,7 @@ export async function getUser(userId: number) {
     showProgram: u.showProgram,
     showMaxes: u.showMaxes,
     showWorkoutDays: u.showWorkoutDays,
+    activeProgramId: u.activeProgramId,
   };
 }
 
@@ -71,6 +73,24 @@ export async function getWorkoutLogsWithSets(userId: number) {
     ...l,
     sets: allSets.filter((s) => s.workoutLogId === l.id),
   }));
+}
+
+export async function getProgramSnapshot(userId: number): Promise<ProgramData> {
+  const schedule = await getSchedule(userId);
+  const workouts = await getWorkoutsWithExercises(userId);
+  return {
+    schedule: schedule.map((s) => ({ day: s.day, workoutType: s.workoutType, category: s.category })),
+    workouts: workouts.map((w) => ({
+      name: w.name,
+      exercises: w.exercises.map((e) => ({
+        name: e.name,
+        sets: e.sets,
+        repMin: e.repMin,
+        repMax: e.repMax,
+        restSeconds: e.restSeconds,
+      })),
+    })),
+  };
 }
 
 export async function lastSetsForExercise(userId: number, exerciseId: number) {

@@ -43,7 +43,6 @@ export type WorkoutLog = {
   userId: number;
   date: string;
   workoutId: number;
-  skipped: boolean;
   sets: SetLog[];
 };
 
@@ -67,6 +66,7 @@ export type AppData = {
     showProgram: boolean;
     showMaxes: boolean;
     showWorkoutDays: boolean;
+    activeProgramId: number | null;
   };
   schedule: ScheduleDay[];
   workouts: Workout[];

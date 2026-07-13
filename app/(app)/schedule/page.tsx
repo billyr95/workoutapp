@@ -26,7 +26,8 @@ export default function SchedulePage() {
   const [showSaveForm, setShowSaveForm] = useState(false);
   const [programName, setProgramName] = useState("");
   const [savingProgram, setSavingProgram] = useState(false);
-  const [selectedProgramId, setSelectedProgramId] = useState("");
+  // null = no explicit choice yet — default to whichever program is currently active
+  const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
   const [loadingProgram, setLoadingProgram] = useState(false);
 
   useEffect(() => {
@@ -42,6 +43,9 @@ export default function SchedulePage() {
   if (loading || !data) return <p className="font-mono text-sm text-[var(--muted)]">Loading…</p>;
 
   const today = DAYS[new Date().getDay()];
+  const activeIdStr = data.user.activeProgramId != null ? String(data.user.activeProgramId) : null;
+  const effectiveProgramId =
+    selectedProgramId ?? (activeIdStr && programs.some((p) => String(p.id) === activeIdStr) ? activeIdStr : "");
 
   function selectDay(d: string) {
     setEditingDay(d);
@@ -103,18 +107,20 @@ export default function SchedulePage() {
     });
     const saved = await res.json();
     setPrograms((prev) => [saved, ...prev]);
+    setSelectedProgramId(String(saved.id));
     setProgramName("");
     setShowSaveForm(false);
     setSavingProgram(false);
+    await refetch();
   }
 
   async function loadProgram() {
-    if (!selectedProgramId) return;
+    if (!effectiveProgramId) return;
     setLoadingProgram(true);
     await fetch("/api/programs/load", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ programId: Number(selectedProgramId) }),
+      body: JSON.stringify({ programId: Number(effectiveProgramId) }),
     });
     setLoadingProgram(false);
     await refetch();
@@ -127,7 +133,7 @@ export default function SchedulePage() {
       body: JSON.stringify({ id }),
     });
     setPrograms((prev) => prev.filter((p) => p.id !== id));
-    if (selectedProgramId === String(id)) setSelectedProgramId("");
+    if (effectiveProgramId === String(id)) setSelectedProgramId("");
   }
 
   return (
@@ -159,25 +165,26 @@ export default function SchedulePage() {
           <p className="font-mono text-xs text-[var(--muted)]">No saved programs yet.</p>
         ) : (
           <div className="flex gap-2">
-            <select value={selectedProgramId} onChange={(e) => setSelectedProgramId(e.target.value)} className="flex-1">
+            <select value={effectiveProgramId} onChange={(e) => setSelectedProgramId(e.target.value)} className="flex-1">
               <option value="">Select a saved program…</option>
               {programs.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
+                  {activeIdStr === String(p.id) ? " (current)" : ""}
                 </option>
               ))}
             </select>
             <button
               className="btn !py-1.5 !px-3 !text-[11px] shrink-0"
               onClick={loadProgram}
-              disabled={!selectedProgramId || loadingProgram}
+              disabled={!effectiveProgramId || loadingProgram}
             >
               {loadingProgram ? "Loading…" : "Load"}
             </button>
-            {selectedProgramId && (
+            {effectiveProgramId && (
               <span
                 className="text-[var(--muted)] hover:text-[var(--red)] cursor-pointer font-mono text-sm px-1 self-center"
-                onClick={() => deleteProgram(Number(selectedProgramId))}
+                onClick={() => deleteProgram(Number(effectiveProgramId))}
                 title="Delete this saved program"
               >
                 ✕
