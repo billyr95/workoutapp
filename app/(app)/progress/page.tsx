@@ -32,6 +32,29 @@ function buildLiftSeries(data: AppData): Map<string, LiftPoint[]> {
   return series;
 }
 
+const RANGE_OPTIONS = [
+  { value: "14", label: "14 Days" },
+  { value: "30", label: "30 Days" },
+  { value: "60", label: "60 Days" },
+  { value: "90", label: "90 Days" },
+  { value: "ytd", label: "This Year" },
+  { value: "365", label: "365 Days" },
+  { value: "730", label: "2 Years" },
+  { value: "1825", label: "5 Years" },
+  { value: "all", label: "All Time" },
+];
+const DEFAULT_RANGE = "30";
+
+// ISO date (YYYY-MM-DD) marking the start of the selected range, or null for "All Time".
+function rangeStartDate(range: string): string | null {
+  if (range === "all") return null;
+  const now = new Date();
+  if (range === "ytd") return `${now.getFullYear()}-01-01`;
+  const d = new Date(now);
+  d.setDate(d.getDate() - Number(range));
+  return d.toISOString().slice(0, 10);
+}
+
 const SERIES_COLORS = [
   "var(--series-1)",
   "var(--series-2)",
@@ -61,8 +84,19 @@ export default function ProgressPage() {
   const [toast, setToast] = useState<string | null>(null);
   // null = user hasn't touched the filter yet; fall back to the most-logged lift for the initial view.
   const [selectedLifts, setSelectedLifts] = useState<string[] | null>(null);
+  const [range, setRange] = useState(DEFAULT_RANGE);
+  const rangeStart = rangeStartDate(range);
 
   const liftSeries = useMemo(() => (data ? buildLiftSeries(data) : new Map<string, LiftPoint[]>()), [data]);
+  const filteredLiftSeries = useMemo(() => {
+    if (!rangeStart) return liftSeries;
+    const out = new Map<string, LiftPoint[]>();
+    for (const [name, points] of liftSeries) {
+      const filtered = points.filter((p) => p.date >= rangeStart);
+      if (filtered.length) out.set(name, filtered);
+    }
+    return out;
+  }, [liftSeries, rangeStart]);
   const defaultLift = useMemo(() => {
     if (liftSeries.size === 0) return null;
     const [mostLogged] = [...liftSeries.entries()].sort((a, b) => b[1].length - a[1].length);
@@ -77,7 +111,8 @@ export default function ProgressPage() {
 
   if (loading || !data) return <p className="font-mono text-sm text-[var(--muted)]">Loading…</p>;
 
-  const weights = [...data.weightLogs].sort((a, b) => a.date.localeCompare(b.date));
+  const allWeights = [...data.weightLogs].sort((a, b) => a.date.localeCompare(b.date));
+  const weights = rangeStart ? allWeights.filter((w) => w.date >= rangeStart) : allWeights;
   const lastM = [...data.measurements].sort((a, b) => a.date.localeCompare(b.date)).slice(-1)[0];
   const liftOptions = [...liftSeries.keys()].sort((a, b) => a.localeCompare(b));
 
@@ -113,9 +148,22 @@ export default function ProgressPage() {
 
   return (
     <div>
+      <div className="section-label mb-3 flex items-center justify-between !gap-3">
+        <span>Progress Range</span>
+        <select
+          value={range}
+          onChange={(e) => setRange(e.target.value)}
+          className="!w-auto max-w-[130px] !py-1 !px-2 !text-[11px] normal-case tracking-normal"
+        >
+          {RANGE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+      </div>
+
       <div className="section-label mb-3">Weight Trend</div>
       <div className="card mb-3.5">
-        <WeightChart weights={weights} />
+        <WeightChart weights={weights} hasHistory={allWeights.length >= 2} />
       </div>
 
       <div className="card mb-3.5">
@@ -130,7 +178,7 @@ export default function ProgressPage() {
         <LiftFilterDropdown options={liftOptions} selected={effectiveSelected} onChange={setSelectedLifts} />
       </div>
       <div className="card mb-3.5">
-        <LiftProgressChart series={liftSeries} selected={effectiveSelected} />
+        <LiftProgressChart series={filteredLiftSeries} selected={effectiveSelected} />
       </div>
 
       <div className="section-label mb-3 mt-5">Personal Records</div>
@@ -203,12 +251,16 @@ function ChartTooltip({ x, y, w, h, title, subtitle }: { x: number; y: number; w
   );
 }
 
-function WeightChart({ weights }: { weights: { date: string; weight: number }[] }) {
+function WeightChart({ weights, hasHistory }: { weights: { date: string; weight: number }[]; hasHistory: boolean }) {
   const [hover, setHover] = useState<Hover | null>(null);
   const [pinned, setPinned] = useState(false);
 
   if (weights.length < 2) {
-    return <div className="text-center text-[var(--muted)] font-mono text-xs py-6">Log a few more weigh-ins to see your trend.</div>;
+    return (
+      <div className="text-center text-[var(--muted)] font-mono text-xs py-6">
+        {hasHistory ? "No weigh-ins in this range — try a wider range." : "Log a few more weigh-ins to see your trend."}
+      </div>
+    );
   }
   const w = 500, h = 156, pad = 20;
   const vals = weights.map((d) => d.weight);
@@ -370,7 +422,7 @@ function LiftProgressChart({ series, selected }: { series: Map<string, LiftPoint
   if (active.length === 0) {
     return (
       <div className="text-center text-[var(--muted)] font-mono text-xs py-6">
-        Select a lift above to see its progress over time.
+        {selected.length === 0 ? "Select a lift above to see its progress over time." : "No data for the selected lift(s) in this range — try a wider range."}
       </div>
     );
   }
