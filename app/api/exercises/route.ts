@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { auth } from "@/auth";
+import { recordCommunityExercise, recordCommunityWorkout } from "@/lib/data";
 
 // body: { workoutId, name, sets, repMin, repMax, restSeconds? }
 export async function POST(req: Request) {
@@ -37,6 +38,16 @@ export async function POST(req: Request) {
     })
     .returning();
 
+  await recordCommunityExercise(name, sets, repMin, repMax, restSeconds ?? null, userId);
+  const siblingExercises = [...allExercises.filter((e) => e.workoutId === workoutId), row].sort(
+    (a, b) => a.sortOrder - b.sortOrder
+  );
+  await recordCommunityWorkout(
+    workout.name,
+    siblingExercises.map((e) => ({ name: e.name, sets: e.sets, repMin: e.repMin, repMax: e.repMax, restSeconds: e.restSeconds })),
+    userId
+  );
+
   return NextResponse.json(row);
 }
 
@@ -60,5 +71,13 @@ export async function DELETE(req: Request) {
   }
 
   await db.delete(schema.exercises).where(eq(schema.exercises.id, id));
+
+  const remaining = allExercises.filter((e) => e.workoutId === exercise.workoutId && e.id !== id).sort((a, b) => a.sortOrder - b.sortOrder);
+  await recordCommunityWorkout(
+    workout.name,
+    remaining.map((e) => ({ name: e.name, sets: e.sets, repMin: e.repMin, repMax: e.repMax, restSeconds: e.restSeconds })),
+    userId
+  );
+
   return NextResponse.json({ ok: true });
 }

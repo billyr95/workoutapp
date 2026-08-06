@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Example program file for the "Upload XML" tab on the Schedule page.
+
+  <program name="..."> — optional; if present, prefills the program name field.
+
+  <schedule> holds up to one <day> per day of the week:
+    name     — Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, or Saturday
+    type     — Rest, Cardio, or Workout
+    workout  — required when type="Workout"; must match a <workout name="..."> below
+    category — Strength or Hypertrophy; only used when type="Workout" (defaults to Strength)
+
+  <workouts> holds one <workout name="..."> per workout referenced above, each
+  containing <exercise> elements:
+    name        — exercise name
+    sets        — whole number, 1-20
+    repMin      — whole number, 1-100
+    repMax      — whole number, 1-100 (defaults to repMin if left out)
+    restSeconds — optional, whole number of seconds between sets
+-->
+<program name="Push Pull Legs">
+  <schedule>
+    <day name="Monday" type="Workout" workout="Push Day" category="Strength" />
+    <day name="Tuesday" type="Workout" workout="Pull Day" category="Strength" />
+    <day name="Wednesday" type="Cardio" />
+    <day name="Thursday" type="Workout" workout="Leg Day" category="Hypertrophy" />
+    <day name="Friday" type="Workout" workout="Push Day" category="Hypertrophy" />
+    <day name="Saturday" type="Rest" />
+    <day name="Sunday" type="Rest" />
+  </schedule>
+  <workouts>
+    <workout name="Push Day">
+      <exercise name="Bench Press" sets="4" repMin="5" repMax="8" restSeconds="120" />
+      <exercise name="Standing Overhead Press" sets="3" repMin="6" repMax="8" restSeconds="90" />
+      <exercise name="Lateral Raises" sets="3" repMin="12" repMax="15" />
+    </workout>
+    <workout name="Pull Day">
+      <exercise name="Pull-ups" sets="4" repMin="6" repMax="10" restSeconds="90" />
+      <exercise name="Chest Supported Row" sets="3" repMin="8" repMax="10" />
+    </workout>
+    <workout name="Leg Day">
+      <exercise name="Squat" sets="4" repMin="5" repMax="8" restSeconds="150" />
+      <exercise name="Romanian Deadlift" sets="3" repMin="8" repMax="10" />
+    </workout>
+  </workouts>
+</program>

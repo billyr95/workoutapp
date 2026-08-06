@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { auth } from "@/auth";
+import { recordCommunityWorkout } from "@/lib/data";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -37,6 +38,8 @@ export async function POST(req: Request) {
     const existingWorkout = allWorkouts.find((w) => w.userId === userId && w.name === name);
     if (!existingWorkout) {
       await db.insert(schema.workouts).values({ userId, name });
+      // Brand new workout for this user — no exercises yet, but the name itself is worth recording.
+      await recordCommunityWorkout(name, [], userId);
     }
   } else {
     return NextResponse.json({ error: "Invalid type" }, { status: 400 });

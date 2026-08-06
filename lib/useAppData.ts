@@ -35,7 +35,6 @@ export type SetLog = {
   setNumber: number;
   weight: number;
   reps: number;
-  rpe: number | null;
 };
 
 export type WorkoutLog = {

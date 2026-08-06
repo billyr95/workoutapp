@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAppData } from "@/lib/useAppData";
+import NewProgramModal from "./NewProgramModal";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -24,6 +25,7 @@ export default function SchedulePage() {
 
   const [programs, setPrograms] = useState<SavedProgram[]>([]);
   const [showSaveForm, setShowSaveForm] = useState(false);
+  const [showNewProgramModal, setShowNewProgramModal] = useState(false);
   const [programName, setProgramName] = useState("");
   const [savingProgram, setSavingProgram] = useState(false);
   // null = no explicit choice yet — default to whichever program is currently active
@@ -140,12 +142,20 @@ export default function SchedulePage() {
     <div>
       <div className="section-label mb-3 flex items-center justify-between !gap-3">
         <span>Programs</span>
-        <button
-          className="btn-ghost !py-1 !px-2.5 !text-[11px] normal-case tracking-normal rounded shrink-0"
-          onClick={() => setShowSaveForm((v) => !v)}
-        >
-          Save Program
-        </button>
+        <div className="flex gap-1.5 shrink-0">
+          <button
+            className="btn-ghost !py-1 !px-2.5 !text-[11px] normal-case tracking-normal rounded"
+            onClick={() => setShowNewProgramModal(true)}
+          >
+            New Program
+          </button>
+          <button
+            className="btn-ghost !py-1 !px-2.5 !text-[11px] normal-case tracking-normal rounded"
+            onClick={() => setShowSaveForm((v) => !v)}
+          >
+            Save Current Setup
+          </button>
+        </div>
       </div>
       <div className="card mb-3.5">
         {showSaveForm && (
@@ -289,6 +299,16 @@ export default function SchedulePage() {
             <button className="btn-ghost !py-1.5 !px-3 !text-[11px] rounded" onClick={() => setEditingDay(null)}>Close</button>
           )}
         </div>
+      )}
+
+      {showNewProgramModal && (
+        <NewProgramModal
+          onClose={() => setShowNewProgramModal(false)}
+          onSaved={(saved) => {
+            setPrograms((prev) => [saved, ...prev]);
+            setSelectedProgramId(String(saved.id));
+          }}
+        />
       )}
     </div>
   );

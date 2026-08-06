@@ -72,7 +72,6 @@ export const setLogs = pgTable("set_logs", {
   setNumber: integer("set_number").notNull(),
   weight: real("weight").notNull(), // supports 0.1 increments
   reps: integer("reps").notNull(),
-  rpe: real("rpe"),
 });
 
 export const cardioLogs = pgTable("cardio_logs", {
@@ -128,4 +127,27 @@ export const programs = pgTable("programs", {
   name: text("name").notNull(),
   data: jsonb("data").$type<ProgramData>().notNull(),
   createdAt: text("created_at").notNull(),
+});
+
+// Community library: every exercise/workout name ever entered, deduplicated by
+// name, so anyone building a program can search and reuse what others typed in.
+export const communityExercises = pgTable("community_exercises", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  sets: integer("sets").notNull(),
+  repMin: integer("rep_min").notNull(),
+  repMax: integer("rep_max").notNull(),
+  restSeconds: integer("rest_seconds"),
+  contributedBy: integer("contributed_by"),
+  useCount: integer("use_count").notNull().default(1),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const communityWorkouts = pgTable("community_workouts", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  exercises: jsonb("exercises").$type<ProgramExercise[]>().notNull().default([]),
+  contributedBy: integer("contributed_by"),
+  useCount: integer("use_count").notNull().default(1),
+  updatedAt: text("updated_at").notNull(),
 });

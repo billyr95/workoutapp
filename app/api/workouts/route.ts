@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { auth } from "@/auth";
 
-// body: { workoutId: number, date: string, sets: [{ exerciseId, setNumber, weight, reps, rpe }] }
+// body: { workoutId: number, date: string, sets: [{ exerciseId, setNumber, weight, reps }] }
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -54,7 +54,6 @@ export async function POST(req: Request) {
       setNumber: s.setNumber,
       weight: s.weight,
       reps: s.reps,
-      rpe: s.rpe ?? null,
     });
   }
 

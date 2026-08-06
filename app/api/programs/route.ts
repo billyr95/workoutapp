@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { auth } from "@/auth";
-import { getProgramSnapshot } from "@/lib/data";
+import { getProgramSnapshot, recordCommunityProgram, validateProgramData } from "@/lib/data";
 
 export async function GET() {
   const session = await auth();
@@ -18,7 +18,9 @@ export async function GET() {
   return NextResponse.json(mine);
 }
 
-// body: { name }
+// body: { name, data? } — omit `data` to snapshot your current live schedule/workouts
+// (and it becomes your active program); pass `data` (from the builder or an XML upload)
+// to save an unapplied program into your library instead.
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -28,17 +30,33 @@ export async function POST(req: Request) {
   const name = typeof body.name === "string" ? body.name.trim() : "";
   if (!name) return NextResponse.json({ error: "Program name is required" }, { status: 400 });
 
-  const data = await getProgramSnapshot(userId);
+  const usingProvidedData = body.data !== undefined;
+  let errors: string[] = [];
+  let data;
+  if (usingProvidedData) {
+    const validated = validateProgramData(body.data);
+    data = validated.data;
+    errors = validated.errors;
+    if (data.schedule.length === 0 && data.workouts.length === 0) {
+      return NextResponse.json({ error: "Program has no valid schedule days or workouts", errors }, { status: 400 });
+    }
+  } else {
+    data = await getProgramSnapshot(userId);
+  }
 
   const [row] = await db
     .insert(schema.programs)
     .values({ userId, name, data, createdAt: new Date().toISOString() })
     .returning();
 
-  // Saving your current setup means that's the program you're now "on."
-  await db.update(schema.users).set({ activeProgramId: row.id }).where(eq(schema.users.id, userId));
+  await recordCommunityProgram(data, userId);
 
-  return NextResponse.json({ id: row.id, name: row.name, createdAt: row.createdAt });
+  if (!usingProvidedData) {
+    // Saving your current setup means that's the program you're now "on."
+    await db.update(schema.users).set({ activeProgramId: row.id }).where(eq(schema.users.id, userId));
+  }
+
+  return NextResponse.json({ id: row.id, name: row.name, createdAt: row.createdAt, errors });
 }
 
 // body: { id }

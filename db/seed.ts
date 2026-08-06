@@ -66,10 +66,10 @@ async function seed() {
 
   if (bench) {
     const benchSets = [
-      { weight: 135, reps: 8, rpe: 8 },
-      { weight: 135, reps: 7, rpe: 9 },
-      { weight: 135, reps: 6, rpe: 9 },
-      { weight: 135, reps: 5, rpe: 10 },
+      { weight: 135, reps: 8 },
+      { weight: 135, reps: 7 },
+      { weight: 135, reps: 6 },
+      { weight: 135, reps: 5 },
     ];
     for (let i = 0; i < benchSets.length; i++) {
       await db.insert(schema.setLogs).values({

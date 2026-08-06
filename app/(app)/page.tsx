@@ -9,7 +9,7 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
-type DraftSet = { weight?: number; reps?: number; rpe?: number };
+type DraftSet = { weight?: number; reps?: number };
 
 export default function TodayPage() {
   const { data, loading, refetch } = useAppData();
@@ -70,7 +70,7 @@ export default function TodayPage() {
       if (skipped[ex.id]) return;
       (draft[ex.id] || []).forEach((s, i) => {
         if (s?.weight && s?.reps) {
-          sets.push({ exerciseId: ex.id, setNumber: i + 1, weight: s.weight, reps: s.reps, rpe: s.rpe ?? null });
+          sets.push({ exerciseId: ex.id, setNumber: i + 1, weight: s.weight, reps: s.reps });
         }
       });
     });
@@ -243,7 +243,7 @@ function ExerciseCard({
         <div className="text-center text-[var(--muted)] font-mono text-xs py-2">Skipped — won&apos;t be logged.</div>
       ) : (
         Array.from({ length: exercise.sets }).map((_, i) => (
-          <div key={i} className="grid grid-cols-[26px_1fr_1fr_1fr] gap-2 items-center mb-1.5">
+          <div key={i} className="grid grid-cols-[26px_1fr_1fr] gap-2 items-center mb-1.5">
             <span className="font-mono text-xs text-[var(--muted)]">{i + 1}</span>
             <input
               type="number"
@@ -257,12 +257,6 @@ function ExerciseCard({
               placeholder="reps"
               value={draft[i]?.reps ?? ""}
               onChange={(e) => onChange(i, "reps", e.target.value)}
-            />
-            <input
-              type="number"
-              placeholder="RPE"
-              value={draft[i]?.rpe ?? ""}
-              onChange={(e) => onChange(i, "rpe", e.target.value)}
             />
           </div>
         ))
