@@ -132,6 +132,16 @@ export default function PublicProfilePage() {
         </div>
       )}
 
+      {profile.weight && (
+        <>
+          <div className="section-label mb-3">Current Weight</div>
+          <div className="card mb-4">
+            <div className="font-display text-3xl">{profile.weight.value}lb</div>
+            <div className="font-mono text-xs text-[var(--chalk-dim)]">as of {profile.weight.date}</div>
+          </div>
+        </>
+      )}
+
       {profile.workoutDays && profile.workoutDays.length > 0 && (
         <>
           <div className="section-label mb-3">Workout History</div>
@@ -167,30 +177,6 @@ export default function PublicProfilePage() {
               );
             })}
           </div>
-        </>
-      )}
-
-      {profile.weight && (
-        <>
-          <div className="section-label mb-3">Current Weight</div>
-          <div className="card mb-4">
-            <div className="font-display text-3xl">{profile.weight.value}lb</div>
-            <div className="font-mono text-xs text-[var(--chalk-dim)]">as of {profile.weight.date}</div>
-          </div>
-        </>
-      )}
-
-      {profile.maxes && profile.maxes.length > 0 && (
-        <>
-          <div className="section-label mb-3">Maxes</div>
-          {profile.maxes.map((m) => (
-            <div key={m.exerciseName} className="card !py-3 !px-4 flex justify-between items-center mb-2">
-              <span className="font-mono text-[13px]">{m.exerciseName}</span>
-              <span className="font-mono text-[11px] uppercase tracking-wide text-[var(--olive)]">
-                {m.weight}lb × {m.reps} — {m.date}
-              </span>
-            </div>
-          ))}
         </>
       )}
 
@@ -234,6 +220,20 @@ export default function PublicProfilePage() {
               );
             })}
           </div>
+        </>
+      )}
+
+      {profile.maxes && profile.maxes.length > 0 && (
+        <>
+          <div className="section-label mb-3 mt-4">Maxes</div>
+          {profile.maxes.map((m) => (
+            <div key={m.exerciseName} className="card !py-3 !px-4 flex justify-between items-center mb-2">
+              <span className="font-mono text-[13px]">{m.exerciseName}</span>
+              <span className="font-mono text-[11px] uppercase tracking-wide text-[var(--olive)]">
+                {m.weight}lb × {m.reps} — {m.date}
+              </span>
+            </div>
+          ))}
         </>
       )}
 

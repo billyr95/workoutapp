@@ -68,11 +68,14 @@ export default function TodayPage() {
     const sets: any[] = [];
     workout.exercises.forEach((ex) => {
       if (skipped[ex.id]) return;
-      (draft[ex.id] || []).forEach((s, i) => {
-        if (s?.weight && s?.reps) {
-          sets.push({ exerciseId: ex.id, setNumber: i + 1, weight: s.weight, reps: s.reps });
-        }
-      });
+      // Sets the user never touched still count if they match last week's autofilled numbers.
+      const last = lastSetsFor(ex.id);
+      for (let i = 0; i < ex.sets; i++) {
+        const d = draft[ex.id]?.[i];
+        const weight = d?.weight ?? last?.[i]?.weight;
+        const reps = d?.reps ?? last?.[i]?.reps;
+        if (weight && reps) sets.push({ exerciseId: ex.id, setNumber: i + 1, weight, reps });
+      }
     });
     if (!sets.length) {
       flash("Log at least one set first");
@@ -242,24 +245,32 @@ function ExerciseCard({
       {skipped ? (
         <div className="text-center text-[var(--muted)] font-mono text-xs py-2">Skipped — won&apos;t be logged.</div>
       ) : (
-        Array.from({ length: exercise.sets }).map((_, i) => (
-          <div key={i} className="grid grid-cols-[26px_1fr_1fr] gap-2 items-center mb-1.5">
-            <span className="font-mono text-xs text-[var(--muted)]">{i + 1}</span>
-            <input
-              type="number"
-              step="0.1"
-              placeholder="lb"
-              value={draft[i]?.weight ?? ""}
-              onChange={(e) => onChange(i, "weight", e.target.value)}
-            />
-            <input
-              type="number"
-              placeholder="reps"
-              value={draft[i]?.reps ?? ""}
-              onChange={(e) => onChange(i, "reps", e.target.value)}
-            />
-          </div>
-        ))
+        Array.from({ length: exercise.sets }).map((_, i) => {
+          const lastW = lastSets?.[i]?.weight;
+          const lastR = lastSets?.[i]?.reps;
+          const weightTouched = draft[i]?.weight !== undefined;
+          const repsTouched = draft[i]?.reps !== undefined;
+          return (
+            <div key={i} className="grid grid-cols-[26px_1fr_1fr] gap-2 items-center mb-1.5">
+              <span className="font-mono text-xs text-[var(--muted)]">{i + 1}</span>
+              <input
+                type="number"
+                step="0.1"
+                placeholder="lb"
+                value={draft[i]?.weight ?? lastW ?? ""}
+                onChange={(e) => onChange(i, "weight", e.target.value)}
+                className={`transition-opacity ${!weightTouched && lastW !== undefined ? "opacity-50" : ""}`}
+              />
+              <input
+                type="number"
+                placeholder="reps"
+                value={draft[i]?.reps ?? lastR ?? ""}
+                onChange={(e) => onChange(i, "reps", e.target.value)}
+                className={`transition-opacity ${!repsTouched && lastR !== undefined ? "opacity-50" : ""}`}
+              />
+            </div>
+          );
+        })
       )}
     </div>
   );
