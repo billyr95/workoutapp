@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAppData, Exercise } from "@/lib/useAppData";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -10,12 +10,38 @@ function todayStr() {
 }
 
 type DraftSet = { weight?: number; reps?: number };
+type StoredDraft = { draft: Record<number, DraftSet[]>; skipped: Record<number, boolean> };
+
+// In-progress sets are mirrored to localStorage as you go, keyed per workout+date,
+// so a page reload mid-session doesn't wipe out what's already been logged.
+function draftStorageKey(workoutId: number, date: string) {
+  return `workout-draft:${workoutId}:${date}`;
+}
+function loadDraft(workoutId: number, date: string): StoredDraft | null {
+  try {
+    const raw = window.localStorage.getItem(draftStorageKey(workoutId, date));
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+function saveDraft(workoutId: number, date: string, data: StoredDraft) {
+  try {
+    window.localStorage.setItem(draftStorageKey(workoutId, date), JSON.stringify(data));
+  } catch {}
+}
+function clearDraft(workoutId: number, date: string) {
+  try {
+    window.localStorage.removeItem(draftStorageKey(workoutId, date));
+  } catch {}
+}
 
 export default function TodayPage() {
   const { data, loading, refetch } = useAppData();
   const [selectedDay, setSelectedDay] = useState(DAYS[new Date().getDay()]);
   const [draft, setDraft] = useState<Record<number, DraftSet[]>>({});
   const [skipped, setSkipped] = useState<Record<number, boolean>>({});
+  const [loadedForWorkoutId, setLoadedForWorkoutId] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [cardioForm, setCardioForm] = useState({ type: "", durationMinutes: "", distance: "", averageHeartRate: "", calories: "" });
 
@@ -32,6 +58,21 @@ export default function TodayPage() {
     () => data?.workouts.find((w) => w.name === sched?.workoutType),
     [data, sched]
   );
+  const workoutId = workout?.id ?? null;
+
+  // Switching to a different workout loads whatever was already in progress for it today —
+  // adjusted during render (not an effect) so it lands before the first paint of the new workout.
+  if (workoutId !== null && workoutId !== loadedForWorkoutId) {
+    const saved = loadDraft(workoutId, todayStr());
+    setDraft(saved?.draft ?? {});
+    setSkipped(saved?.skipped ?? {});
+    setLoadedForWorkoutId(workoutId);
+  }
+
+  useEffect(() => {
+    if (workoutId === null) return;
+    saveDraft(workoutId, todayStr(), { draft, skipped });
+  }, [workoutId, draft, skipped]);
 
   if (loading || !data) {
     return <p className="font-mono text-sm text-[var(--muted)]">Loading…</p>;
@@ -89,6 +130,7 @@ export default function TodayPage() {
     const json = await res.json();
     setDraft({});
     setSkipped({});
+    clearDraft(workout.id, todayStr());
     await refetch();
     flash(json.newPRs?.length ? `Saved — new PR: ${json.newPRs.map((p: any) => p.exercise).join(", ")}` : "Workout saved");
   }
@@ -119,11 +161,7 @@ export default function TodayPage() {
       <div className="section-label mb-3">Session</div>
       <select
         value={selectedDay}
-        onChange={(e) => {
-          setSelectedDay(e.target.value);
-          setDraft({});
-          setSkipped({});
-        }}
+        onChange={(e) => setSelectedDay(e.target.value)}
         className="mb-4"
       >
         {DAYS.map((d) => (
@@ -223,6 +261,23 @@ function ExerciseCard({
   onChange: (idx: number, field: keyof DraftSet, value: string) => void;
   onToggleSkip: () => void;
 }) {
+  // Autofilled (untouched) fields clear on focus instead of forcing the user to
+  // select/backspace over the suggested number just to replace the first digit.
+  const [clearedFields, setClearedFields] = useState<Set<string>>(new Set());
+
+  function handleFocus(key: string, touched: boolean, hasPrefill: boolean) {
+    if (touched || !hasPrefill) return;
+    setClearedFields((prev) => new Set(prev).add(key));
+  }
+  function handleBlur(key: string) {
+    setClearedFields((prev) => {
+      if (!prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+  }
+
   return (
     <div className="card mb-3">
       <div className="flex items-start justify-between gap-3">
@@ -250,6 +305,10 @@ function ExerciseCard({
           const lastR = lastSets?.[i]?.reps;
           const weightTouched = draft[i]?.weight !== undefined;
           const repsTouched = draft[i]?.reps !== undefined;
+          const weightKey = `${i}-weight`;
+          const repsKey = `${i}-reps`;
+          const weightValue = weightTouched ? draft[i]!.weight : clearedFields.has(weightKey) ? "" : lastW ?? "";
+          const repsValue = repsTouched ? draft[i]!.reps : clearedFields.has(repsKey) ? "" : lastR ?? "";
           return (
             <div key={i} className="grid grid-cols-[26px_1fr_1fr] gap-2 items-center mb-1.5">
               <span className="font-mono text-xs text-[var(--muted)]">{i + 1}</span>
@@ -257,15 +316,19 @@ function ExerciseCard({
                 type="number"
                 step="0.1"
                 placeholder="lb"
-                value={draft[i]?.weight ?? lastW ?? ""}
+                value={weightValue}
                 onChange={(e) => onChange(i, "weight", e.target.value)}
+                onFocus={() => handleFocus(weightKey, weightTouched, lastW !== undefined)}
+                onBlur={() => handleBlur(weightKey)}
                 className={`transition-opacity ${!weightTouched && lastW !== undefined ? "opacity-50" : ""}`}
               />
               <input
                 type="number"
                 placeholder="reps"
-                value={draft[i]?.reps ?? lastR ?? ""}
+                value={repsValue}
                 onChange={(e) => onChange(i, "reps", e.target.value)}
+                onFocus={() => handleFocus(repsKey, repsTouched, lastR !== undefined)}
+                onBlur={() => handleBlur(repsKey)}
                 className={`transition-opacity ${!repsTouched && lastR !== undefined ? "opacity-50" : ""}`}
               />
             </div>
