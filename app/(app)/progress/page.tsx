@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAppData, AppData } from "@/lib/useAppData";
 
 function todayStr() {
@@ -155,6 +155,8 @@ export default function ProgressPage() {
 
   return (
     <div>
+      <WeeklyReview />
+
       <div className="section-label mb-3 flex items-center justify-between !gap-3">
         <span>Progress Range</span>
         <select
@@ -256,6 +258,41 @@ export default function ProgressPage() {
   );
 }
 
+type ReviewState = { status: "loading" } | { status: "ready"; content: string } | { status: "error"; message: string };
+
+function WeeklyReview() {
+  const [state, setState] = useState<ReviewState>({ status: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/progress/review")
+      .then(async (res) => {
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Couldn't load your review");
+        if (!cancelled) setState({ status: "ready", content: json.content });
+      })
+      .catch((err) => {
+        if (!cancelled) setState({ status: "error", message: err instanceof Error ? err.message : "Couldn't load your review" });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (state.status === "error") return null;
+
+  return (
+    <div className="card mb-3.5 !border-[var(--olive)]">
+      <div className="section-label mb-2 !text-[var(--olive)]">Coach&apos;s Take</div>
+      {state.status === "loading" ? (
+        <p className="font-mono text-xs text-[var(--muted)]">Reviewing your week…</p>
+      ) : (
+        <p className="text-[13px] leading-relaxed">{state.content}</p>
+      )}
+    </div>
+  );
+}
+
 function formatDate(iso: string, withYear = false) {
   const d = new Date(iso + "T00:00:00");
   return d.toLocaleDateString("en-US", withYear ? { month: "short", day: "numeric", year: "numeric" } : { month: "short", day: "numeric" });
@@ -345,8 +382,8 @@ function WeightChart({ weights, hasHistory }: { weights: { date: string; weight:
             <feDisplacementMap in="SourceGraphic" in2="noise" scale={3} />
           </filter>
           <linearGradient id="weightAreaFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#c8102e" stopOpacity={0.22} />
-            <stop offset="100%" stopColor="#c8102e" stopOpacity={0} />
+            <stop offset="0%" stopColor="#f5582a" stopOpacity={0.22} />
+            <stop offset="100%" stopColor="#f5582a" stopOpacity={0} />
           </linearGradient>
         </defs>
         {[min, mid, max].map((v, i) => {
@@ -362,7 +399,7 @@ function WeightChart({ weights, hasHistory }: { weights: { date: string; weight:
         <path d={path} fill="none" stroke="#e9e4d8" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" filter="url(#chalkFilter)" opacity={0.9} />
         {points.map(([x, y], i) => (
           <g key={i}>
-            <circle cx={x} cy={y} r={4} fill="#c8102e" stroke="var(--surface)" strokeWidth={2} />
+            <circle cx={x} cy={y} r={4} fill="#f5582a" stroke="var(--surface)" strokeWidth={2} />
             <circle
               cx={x}
               cy={y}

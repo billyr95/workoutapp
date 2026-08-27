@@ -96,6 +96,89 @@ export async function getProgramSnapshot(userId: number): Promise<ProgramData> {
   };
 }
 
+// Plain-text digest of the trailing 7 days, fed to the AI weekly review prompt.
+export async function buildWeeklySummary(userId: number): Promise<string> {
+  const today = new Date();
+  const weekAgo = new Date(today);
+  weekAgo.setDate(weekAgo.getDate() - 6);
+  const todayStr = today.toISOString().slice(0, 10);
+  const weekAgoStr = weekAgo.toISOString().slice(0, 10);
+
+  const schedule = await getSchedule(userId);
+  const workouts = await getWorkoutsWithExercises(userId);
+  const exerciseNameById = new Map<number, string>();
+  workouts.forEach((w) => w.exercises.forEach((e) => exerciseNameById.set(e.id, e.name)));
+
+  const logs = (await getWorkoutLogsWithSets(userId))
+    .filter((l) => l.date >= weekAgoStr && l.date <= todayStr)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const cardio = (await getCardioLogs(userId)).filter((c) => c.date >= weekAgoStr && c.date <= todayStr);
+  const weights = (await getWeightLogs(userId)).filter((w) => w.date >= weekAgoStr && w.date <= todayStr);
+  const prs = (await getPersonalRecords(userId)).filter((p) => p.date >= weekAgoStr && p.date <= todayStr);
+
+  const lines: string[] = [`Training window: ${weekAgoStr} to ${todayStr} (last 7 days).`];
+
+  if (schedule.length > 0) {
+    lines.push(
+      "Weekly schedule: " +
+        schedule.map((s) => `${s.day}: ${s.workoutType}${s.category ? ` (${s.category})` : ""}`).join("; ") +
+        "."
+    );
+  }
+
+  if (logs.length === 0) {
+    lines.push("No workouts were logged this week.");
+  } else {
+    lines.push(`Logged ${logs.length} workout session(s) this week:`);
+    for (const log of logs) {
+      const workout = workouts.find((w) => w.id === log.workoutId);
+      const byExercise = new Map<number, typeof log.sets>();
+      for (const s of log.sets) {
+        if (!byExercise.has(s.exerciseId)) byExercise.set(s.exerciseId, []);
+        byExercise.get(s.exerciseId)!.push(s);
+      }
+      const exerciseSummaries = [...byExercise.entries()].map(([exId, sets]) => {
+        const name = exerciseNameById.get(exId) ?? "Unknown exercise";
+        const setsStr = [...sets].sort((a, b) => a.setNumber - b.setNumber).map((s) => `${s.weight}x${s.reps}`).join(", ");
+        return `${name} (${setsStr})`;
+      });
+      lines.push(`- ${log.date}${workout ? ` [${workout.name}]` : ""}: ${exerciseSummaries.join("; ")}`);
+    }
+  }
+
+  if (cardio.length > 0) {
+    lines.push(
+      "Cardio sessions: " +
+        cardio.map((c) => `${c.date} ${c.type} ${c.durationMinutes}min${c.distance ? ` (${c.distance}mi)` : ""}`).join("; ") +
+        "."
+    );
+  }
+
+  if (weights.length > 0) {
+    const sorted = [...weights].sort((a, b) => a.date.localeCompare(b.date));
+    if (sorted.length >= 2) {
+      const delta = sorted[sorted.length - 1].weight - sorted[0].weight;
+      lines.push(
+        `Weight went from ${sorted[0].weight}lb (${sorted[0].date}) to ${sorted[sorted.length - 1].weight}lb (${sorted[sorted.length - 1].date}), a change of ${delta >= 0 ? "+" : ""}${delta.toFixed(1)}lb.`
+      );
+    } else {
+      lines.push(`Weight logged once this week: ${sorted[0].weight}lb on ${sorted[0].date}.`);
+    }
+  } else {
+    lines.push("No weigh-ins logged this week.");
+  }
+
+  if (prs.length > 0) {
+    lines.push(
+      "New personal records this week: " +
+        prs.map((p) => `${p.exerciseName} ${p.weight}lb x ${p.reps} on ${p.date}`).join("; ") +
+        "."
+    );
+  }
+
+  return lines.join("\n");
+}
+
 export async function lastSetsForExercise(userId: number, exerciseId: number) {
   const logs = (await getWorkoutLogsWithSets(userId)).sort((a, b) => b.date.localeCompare(a.date));
   for (const log of logs) {

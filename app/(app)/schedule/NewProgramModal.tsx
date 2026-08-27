@@ -16,6 +16,19 @@ function emptyDays(): Record<string, DayDraft> {
   return out;
 }
 
+type GeneratedProgram = { id: number; name: string; data: ProgramData; errors: string[] };
+
+async function generateProgram(goals: string): Promise<{ program?: GeneratedProgram; error?: string }> {
+  const res = await fetch("/api/programs/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ goals }),
+  });
+  const json = await res.json();
+  if (!res.ok) return { error: json.error ?? "Couldn't generate a program" };
+  return { program: { id: json.id, name: json.name, data: json.data, errors: json.errors ?? [] } };
+}
+
 async function saveProgram(name: string, data: ProgramData): Promise<{ program?: SavedProgram; errors: string[]; error?: string }> {
   const res = await fetch("/api/programs", {
     method: "POST",
@@ -55,8 +68,16 @@ function parseProgramXml(text: string): { name: string | null; data: { schedule:
   return { name, data: { schedule, workouts } };
 }
 
-export default function NewProgramModal({ onClose, onSaved }: { onClose: () => void; onSaved: (p: SavedProgram) => void }) {
-  const [tab, setTab] = useState<"build" | "xml">("build");
+export default function NewProgramModal({
+  onClose,
+  onSaved,
+  onLoaded,
+}: {
+  onClose: () => void;
+  onSaved: (p: SavedProgram) => void;
+  onLoaded?: () => void;
+}) {
+  const [tab, setTab] = useState<"build" | "xml" | "ai">("build");
   const [name, setName] = useState("");
   const [days, setDays] = useState<Record<string, DayDraft>>(emptyDays);
   const [workouts, setWorkouts] = useState<ProgramWorkout[]>([]);
@@ -65,9 +86,45 @@ export default function NewProgramModal({ onClose, onSaved }: { onClose: () => v
   const [xmlFileName, setXmlFileName] = useState("");
   const [xmlParseError, setXmlParseError] = useState("");
 
+  const [goals, setGoals] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState("");
+  const [generated, setGenerated] = useState<GeneratedProgram | null>(null);
+  const [loadingGenerated, setLoadingGenerated] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [result, setResult] = useState<{ program: SavedProgram; warnings: string[] } | null>(null);
+
+  async function handleGenerate() {
+    setGenerateError("");
+    if (!goals.trim()) {
+      setGenerateError("Describe your goals first.");
+      return;
+    }
+    setGenerating(true);
+    const res = await generateProgram(goals.trim());
+    setGenerating(false);
+    if (!res.program) {
+      setGenerateError(res.error ?? "Couldn't generate a program");
+      return;
+    }
+    setGenerated(res.program);
+    onSaved({ id: res.program.id, name: res.program.name, createdAt: new Date().toISOString() });
+  }
+
+  async function handleLoadGenerated() {
+    if (!generated) return;
+    setLoadingGenerated(true);
+    await fetch("/api/programs/load", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ programId: generated.id }),
+    });
+    setLoadingGenerated(false);
+    onLoaded?.();
+    onClose();
+  }
 
   function updateDayType(day: string, type: DayType) {
     setDays((prev) => ({ ...prev, [day]: { ...prev[day], type } }));
@@ -168,7 +225,7 @@ export default function NewProgramModal({ onClose, onSaved }: { onClose: () => v
           </div>
         ) : (
           <>
-            <input placeholder="Program name" value={name} onChange={(e) => setName(e.target.value)} className="mb-3" />
+            {tab !== "ai" && <input placeholder="Program name" value={name} onChange={(e) => setName(e.target.value)} className="mb-3" />}
 
             <div className="flex gap-2 mb-3.5">
               <button
@@ -183,9 +240,81 @@ export default function NewProgramModal({ onClose, onSaved }: { onClose: () => v
               >
                 Upload XML
               </button>
+              <button
+                className={`btn-ghost !py-1.5 !px-3 !text-[11px] rounded flex-1 ${tab === "ai" ? "!border-[var(--red)] !text-[var(--chalk)]" : ""}`}
+                onClick={() => setTab("ai")}
+              >
+                AI Generate
+              </button>
             </div>
 
-            {tab === "build" ? (
+            {tab === "ai" ? (
+              <div>
+                {generated ? (
+                  <div>
+                    <p className="font-mono text-sm text-[var(--olive)] mb-1">&ldquo;{generated.name}&rdquo; is saved to your library.</p>
+                    {generated.errors.length > 0 && (
+                      <ul className="font-mono text-[11px] text-[var(--muted)] list-disc pl-4 space-y-0.5 mb-2">
+                        {generated.errors.map((w, i) => <li key={i}>{w}</li>)}
+                      </ul>
+                    )}
+                    <div className="grid gap-2 mb-3.5 mt-2">
+                      {generated.data.schedule.map((s) => {
+                        const workout = generated.data.workouts.find((w) => w.name === s.workoutType);
+                        return (
+                          <div key={s.day} className="card !py-2.5 !px-3">
+                            <div className="flex justify-between items-center">
+                              <span className="font-display text-base w-24">{s.day}</span>
+                              <span className="font-mono text-xs text-[var(--chalk-dim)]">
+                                {s.workoutType}{s.category ? ` · ${s.category}` : ""}
+                              </span>
+                            </div>
+                            {workout && workout.exercises.length > 0 && (
+                              <div className="mt-1.5 pt-1.5 border-t border-[var(--line)]">
+                                {workout.exercises.map((ex) => (
+                                  <div key={ex.name} className="font-mono text-[11px] text-[var(--chalk-dim)]">
+                                    {ex.name} — {ex.sets}×{ex.repMin}{ex.repMax !== ex.repMin ? `-${ex.repMax}` : ""}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="flex gap-2">
+                      <button className="btn !py-1.5 !px-3 !text-[11px]" onClick={handleLoadGenerated} disabled={loadingGenerated}>
+                        {loadingGenerated ? "Loading…" : "Load This Program"}
+                      </button>
+                      <button className="btn-ghost !py-1.5 !px-3 !text-[11px] rounded" onClick={() => setGenerated(null)}>
+                        Regenerate
+                      </button>
+                      <button className="btn-ghost !py-1.5 !px-3 !text-[11px] rounded" onClick={onClose}>Close</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="font-mono text-[11px] text-[var(--chalk-dim)] mb-2">
+                      Describe your goals, equipment, experience, and how many days a week you want to train — the AI designs the full week and saves it to your library.
+                    </p>
+                    <textarea
+                      placeholder="e.g. I want to build bigger arms and a stronger bench, 4 days a week, full gym access, no lower back issues"
+                      value={goals}
+                      onChange={(e) => setGoals(e.target.value)}
+                      rows={4}
+                      className="mb-2 resize-none"
+                    />
+                    {generateError && <p className="font-mono text-[11px] text-[var(--red)] mb-2">{generateError}</p>}
+                    <div className="flex gap-2">
+                      <button className="btn !py-1.5 !px-3 !text-[11px]" onClick={handleGenerate} disabled={generating}>
+                        {generating ? "Designing your program…" : "Generate Program"}
+                      </button>
+                      <button className="btn-ghost !py-1.5 !px-3 !text-[11px] rounded" onClick={onClose}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : tab === "build" ? (
               <div>
                 <TemplateSearch onApply={applyTemplateToDay} />
                 <div className="grid gap-2 mt-3">
@@ -226,13 +355,17 @@ export default function NewProgramModal({ onClose, onSaved }: { onClose: () => v
               </div>
             )}
 
-            {saveError && <p className="font-mono text-[11px] text-[var(--red)] mt-3">{saveError}</p>}
-            <div className="flex gap-2 mt-3.5">
-              <button className="btn !py-1.5 !px-3 !text-[11px]" onClick={handleSave} disabled={saving}>
-                {saving ? "Saving…" : "Save Program"}
-              </button>
-              <button className="btn-ghost !py-1.5 !px-3 !text-[11px] rounded" onClick={onClose}>Cancel</button>
-            </div>
+            {tab !== "ai" && (
+              <>
+                {saveError && <p className="font-mono text-[11px] text-[var(--red)] mt-3">{saveError}</p>}
+                <div className="flex gap-2 mt-3.5">
+                  <button className="btn !py-1.5 !px-3 !text-[11px]" onClick={handleSave} disabled={saving}>
+                    {saving ? "Saving…" : "Save Program"}
+                  </button>
+                  <button className="btn-ghost !py-1.5 !px-3 !text-[11px] rounded" onClick={onClose}>Cancel</button>
+                </div>
+              </>
+            )}
           </>
         )}
       </div>

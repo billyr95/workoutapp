@@ -151,3 +151,12 @@ export const communityWorkouts = pgTable("community_workouts", {
   useCount: integer("use_count").notNull().default(1),
   updatedAt: text("updated_at").notNull(),
 });
+
+// One AI-generated training review per user per day, cached so it's not regenerated on every page load.
+export const aiReviews = pgTable("ai_reviews", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  date: text("date").notNull(),
+  content: text("content").notNull(),
+  createdAt: text("created_at").notNull(),
+});

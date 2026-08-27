@@ -308,6 +308,7 @@ export default function SchedulePage() {
             setPrograms((prev) => [saved, ...prev]);
             setSelectedProgramId(String(saved.id));
           }}
+          onLoaded={refetch}
         />
       )}
     </div>
