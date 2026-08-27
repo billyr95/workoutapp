@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useAppData, AppData } from "@/lib/useAppData";
 
 function todayStr() {
@@ -114,7 +114,14 @@ export default function ProgressPage() {
   const allWeights = [...data.weightLogs].sort((a, b) => a.date.localeCompare(b.date));
   const weights = rangeStart ? allWeights.filter((w) => w.date >= rangeStart) : allWeights;
   const lastM = [...data.measurements].sort((a, b) => a.date.localeCompare(b.date)).slice(-1)[0];
-  const liftOptions = [...liftSeries.keys()].sort((a, b) => a.localeCompare(b));
+
+  function toggleLift(name: string) {
+    if (effectiveSelected.includes(name)) {
+      setSelectedLifts(effectiveSelected.filter((n) => n !== name));
+    } else if (effectiveSelected.length < MAX_SELECTED_LIFTS) {
+      setSelectedLifts([...effectiveSelected, name]);
+    }
+  }
 
   async function saveWeight() {
     const v = Number(weightInput);
@@ -175,7 +182,14 @@ export default function ProgressPage() {
 
       <div className="section-label mb-3 mt-5 flex items-center justify-between !gap-3">
         <span>Lift Progress</span>
-        <LiftFilterDropdown options={liftOptions} selected={effectiveSelected} onChange={setSelectedLifts} />
+        {effectiveSelected.length > 0 && (
+          <button
+            className="btn-ghost !py-1 !px-2.5 !text-[11px] normal-case tracking-normal rounded shrink-0"
+            onClick={() => setSelectedLifts([])}
+          >
+            Clear
+          </button>
+        )}
       </div>
       <div className="card mb-3.5">
         <LiftProgressChart series={filteredLiftSeries} selected={effectiveSelected} />
@@ -185,14 +199,35 @@ export default function ProgressPage() {
       {data.personalRecords.length === 0 ? (
         <div className="card text-center text-[var(--muted)] font-mono text-xs">No PRs logged yet.</div>
       ) : (
-        data.personalRecords.map((p) => (
-          <div key={p.id} className="card !py-3 !px-4 flex justify-between items-center mb-2">
-            <span className="font-mono text-[13px]">{p.exerciseName}</span>
-            <span className="font-mono text-[11px] uppercase tracking-wide text-[var(--olive)]">
-              {p.weight}lb × {p.reps} — {p.date}
-            </span>
-          </div>
-        ))
+        <>
+          <p className="font-mono text-[11px] text-[var(--muted)] mb-2">Tap a lift to graph it above — pick up to {MAX_SELECTED_LIFTS}.</p>
+          {data.personalRecords.map((p) => {
+            const chartable = liftSeries.has(p.exerciseName);
+            const active = effectiveSelected.includes(p.exerciseName);
+            const color = colorForLift(p.exerciseName);
+            return (
+              <button
+                key={p.id}
+                type="button"
+                disabled={!chartable}
+                onClick={() => toggleLift(p.exerciseName)}
+                className="card !py-3 !px-4 flex justify-between items-center mb-2 w-full text-left transition-colors disabled:cursor-default"
+                style={{
+                  borderColor: active ? color : "var(--line)",
+                  background: active ? "color-mix(in srgb, " + color + " 10%, var(--surface))" : "var(--surface)",
+                }}
+              >
+                <span className="font-mono text-[13px] flex items-center gap-2">
+                  {chartable && <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ background: color, opacity: active ? 1 : 0.35 }} />}
+                  {p.exerciseName}
+                </span>
+                <span className="font-mono text-[11px] uppercase tracking-wide text-[var(--olive)]">
+                  {p.weight}lb × {p.reps} — {p.date}
+                </span>
+              </button>
+            );
+          })}
+        </>
       )}
 
       <div className="section-label mb-3 mt-5">Measurements</div>
@@ -265,13 +300,16 @@ function WeightChart({ weights, hasHistory }: { weights: { date: string; weight:
   const w = 500, h = 156, pad = 20;
   const vals = weights.map((d) => d.weight);
   const min = Math.min(...vals) - 1, max = Math.max(...vals) + 1;
+  const mid = (min + max) / 2;
+  const plotBottom = h - pad;
+  const yForWeight = (weight: number) => plotBottom - ((weight - min) / (max - min || 1)) * (h - pad * 2);
   const points = weights.map((d, i) => {
     const x = pad + (i / (weights.length - 1)) * (w - pad * 2);
-    const y = h - pad - ((d.weight - min) / (max - min || 1)) * (h - pad * 2);
-    return [x, y];
+    return [x, yForWeight(d.weight)];
   });
   let path = `M ${points[0][0]} ${points[0][1]}`;
   for (let i = 1; i < points.length; i++) path += ` L ${points[i][0]} ${points[i][1]}`;
+  const areaPath = `${path} L ${points[points.length - 1][0]} ${plotBottom} L ${points[0][0]} ${plotBottom} Z`;
 
   function show(x: number, y: number, weight: number, date: string) {
     setHover({ x, y, title: `${weight}lb`, subtitle: formatDate(date, true) });
@@ -306,12 +344,25 @@ function WeightChart({ weights, hasHistory }: { weights: { date: string; weight:
             <feTurbulence type="fractalNoise" baseFrequency="0.02 0.9" numOctaves={1} seed={4} result="noise" />
             <feDisplacementMap in="SourceGraphic" in2="noise" scale={3} />
           </filter>
+          <linearGradient id="weightAreaFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#c8102e" stopOpacity={0.22} />
+            <stop offset="100%" stopColor="#c8102e" stopOpacity={0} />
+          </linearGradient>
         </defs>
-        <line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} stroke="#37393d" strokeWidth={1} />
-        <path d={path} fill="none" stroke="#e9e4d8" strokeWidth={2} filter="url(#chalkFilter)" opacity={0.9} />
+        {[min, mid, max].map((v, i) => {
+          const y = yForWeight(v);
+          return (
+            <g key={i}>
+              <line x1={pad} y1={y} x2={w - pad} y2={y} stroke="#37393d" strokeWidth={1} />
+              <text x={pad} y={y - 4} fill="#74777c" fontFamily="IBM Plex Mono" fontSize={10}>{Math.round(v)}lb</text>
+            </g>
+          );
+        })}
+        <path d={areaPath} fill="url(#weightAreaFill)" stroke="none" />
+        <path d={path} fill="none" stroke="#e9e4d8" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" filter="url(#chalkFilter)" opacity={0.9} />
         {points.map(([x, y], i) => (
           <g key={i}>
-            <circle cx={x} cy={y} r={3} fill="#c8102e" />
+            <circle cx={x} cy={y} r={4} fill="#c8102e" stroke="var(--surface)" strokeWidth={2} />
             <circle
               cx={x}
               cy={y}
@@ -340,73 +391,8 @@ function WeightChart({ weights, hasHistory }: { weights: { date: string; weight:
             </text>
           );
         })}
-        <text x={pad} y={14} fill="#74777c" fontFamily="IBM Plex Mono" fontSize={10}>{max.toFixed(0)}</text>
-        <text x={pad} y={h - pad - 4} fill="#74777c" fontFamily="IBM Plex Mono" fontSize={10}>{min.toFixed(0)}</text>
       </svg>
       {hover && <ChartTooltip x={hover.x} y={hover.y} w={w} h={h} title={hover.title} subtitle={hover.subtitle} />}
-    </div>
-  );
-}
-
-function LiftFilterDropdown({
-  options,
-  selected,
-  onChange,
-}: {
-  options: string[];
-  selected: string[];
-  onChange: (next: string[]) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function onClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, []);
-
-  function toggle(name: string) {
-    if (selected.includes(name)) {
-      onChange(selected.filter((n) => n !== name));
-    } else if (selected.length < MAX_SELECTED_LIFTS) {
-      onChange([...selected, name]);
-    }
-  }
-
-  return (
-    <div className="relative font-mono" ref={ref}>
-      <button
-        type="button"
-        className="btn-ghost rounded !py-1 !px-2.5 !text-[11px] normal-case tracking-normal flex items-center gap-1.5"
-        onClick={() => setOpen((o) => !o)}
-      >
-        {selected.length === 0 ? "Select lifts" : `${selected.length} lift${selected.length > 1 ? "s" : ""}`}
-        <span className="text-[var(--muted)]">▾</span>
-      </button>
-      {open && (
-        <div className="absolute right-0 z-10 mt-1.5 w-64 max-h-72 overflow-y-auto card !p-1.5">
-          {options.length === 0 && (
-            <div className="text-[11px] text-[var(--muted)] px-2 py-2">No logged lifts yet.</div>
-          )}
-          {options.map((name) => {
-            const checked = selected.includes(name);
-            const disabled = !checked && selected.length >= MAX_SELECTED_LIFTS;
-            return (
-              <label
-                key={name}
-                className={`flex items-center gap-2 px-2 py-1.5 rounded text-[12px] cursor-pointer hover:bg-[var(--surface2)] ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
-              >
-                <input type="checkbox" checked={checked} disabled={disabled} onChange={() => toggle(name)} className="!w-auto" />
-                <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ background: colorForLift(name) }} />
-                {name}
-              </label>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
@@ -427,18 +413,19 @@ function LiftProgressChart({ series, selected }: { series: Map<string, LiftPoint
     );
   }
 
-  const w = 500, h = 196, pad = 24;
+  const w = 500, h = 196, pad = 24, padRight = pad + 34;
   const allPoints = active.flatMap((s) => s.points);
   const dates = allPoints.map((p) => new Date(p.date).getTime());
   const minDate = Math.min(...dates), maxDate = Math.max(...dates);
   const dateRange = maxDate - minDate || 1;
   const weights = allPoints.map((p) => p.weight);
   const minW = Math.min(...weights) - 5, maxW = Math.max(...weights) + 5;
+  const midW = (minW + maxW) / 2;
   const wRange = maxW - minW || 1;
 
-  const xFor = (date: string) => pad + ((new Date(date).getTime() - minDate) / dateRange) * (w - pad * 2);
+  const xFor = (date: string) => pad + ((new Date(date).getTime() - minDate) / dateRange) * (w - pad - padRight);
   const yFor = (weight: number) => h - pad - ((weight - minW) / wRange) * (h - pad * 2);
-  const xForTime = (t: number) => pad + ((t - minDate) / dateRange) * (w - pad * 2);
+  const xForTime = (t: number) => pad + ((t - minDate) / dateRange) * (w - pad - padRight);
 
   function show(x: number, y: number, weight: number, name: string, date: string) {
     setHover({ x, y, title: `${weight}lb`, subtitle: `${name} · ${formatDate(date, true)}` });
@@ -462,6 +449,18 @@ function LiftProgressChart({ series, selected }: { series: Map<string, LiftPoint
   const tickCount = Math.min(5, allPoints.length);
   const axisTicks = Array.from({ length: tickCount }, (_, i) => minDate + (dateRange * i) / Math.max(1, tickCount - 1));
 
+  // Sparing end-of-line labels: place the last value for each series, skipping any
+  // that would land too close (vertically) to one already placed.
+  const endLabels: { x: number; y: number; text: string }[] = [];
+  const placedY: number[] = [];
+  for (const s of [...active].sort((a, b) => yFor(a.points[a.points.length - 1].weight) - yFor(b.points[b.points.length - 1].weight))) {
+    const lastPoint = s.points[s.points.length - 1];
+    const y = yFor(lastPoint.weight);
+    if (placedY.some((py) => Math.abs(py - y) < 13)) continue;
+    placedY.push(y);
+    endLabels.push({ x: xFor(lastPoint.date), y, text: `${lastPoint.weight}lb` });
+  }
+
   return (
     <div className="relative">
       <svg
@@ -471,7 +470,9 @@ function LiftProgressChart({ series, selected }: { series: Map<string, LiftPoint
           if (pinned) { setPinned(false); setHover(null); }
         }}
       >
-        <line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} stroke="var(--line)" strokeWidth={1} />
+        {[minW, midW, maxW].map((v, i) => (
+          <line key={i} x1={pad} y1={yFor(v)} x2={w - pad} y2={yFor(v)} stroke="var(--line)" strokeWidth={1} />
+        ))}
         {active.map((s) => {
           const color = colorForLift(s.name);
           const pts = s.points.map((p) => [xFor(p.date), yFor(p.weight)] as const);
@@ -479,10 +480,10 @@ function LiftProgressChart({ series, selected }: { series: Map<string, LiftPoint
           for (let i = 1; i < pts.length; i++) path += ` L ${pts[i][0]} ${pts[i][1]}`;
           return (
             <g key={s.name}>
-              {pts.length > 1 && <path d={path} fill="none" stroke={color} strokeWidth={2} opacity={0.9} />}
+              {pts.length > 1 && <path d={path} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />}
               {pts.map(([x, y], i) => (
                 <g key={i}>
-                  <circle cx={x} cy={y} r={3.5} fill={color} />
+                  <circle cx={x} cy={y} r={4} fill={color} stroke="var(--surface)" strokeWidth={2} />
                   <circle
                     cx={x}
                     cy={y}
@@ -518,8 +519,12 @@ function LiftProgressChart({ series, selected }: { series: Map<string, LiftPoint
             </text>
           );
         })}
-        <text x={pad} y={14} fill="var(--muted)" fontFamily="IBM Plex Mono" fontSize={10}>{maxW.toFixed(0)}lb</text>
-        <text x={pad} y={h - pad - 4} fill="var(--muted)" fontFamily="IBM Plex Mono" fontSize={10}>{minW.toFixed(0)}lb</text>
+        {[minW, midW, maxW].map((v, i) => (
+          <text key={i} x={pad} y={yFor(v) - 4} fill="var(--muted)" fontFamily="IBM Plex Mono" fontSize={10}>{Math.round(v)}lb</text>
+        ))}
+        {endLabels.map((l, i) => (
+          <text key={i} x={l.x + 8} y={l.y + 3} fill="var(--chalk-dim)" fontFamily="IBM Plex Mono" fontSize={10}>{l.text}</text>
+        ))}
       </svg>
       {hover && <ChartTooltip x={hover.x} y={hover.y} w={w} h={h} title={hover.title} subtitle={hover.subtitle} />}
       <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-2">
