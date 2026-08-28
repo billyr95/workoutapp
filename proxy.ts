@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 
-const PUBLIC_PATHS = ["/auth/sign-in", "/auth/sign-up"];
+// Sign-in/sign-up bounce an already-authenticated user back to "/" — terms/privacy stay
+// visible either way, since they're referenced from the sign-up form and useful post-login too.
+const AUTH_FORM_PATHS = ["/auth/sign-in", "/auth/sign-up"];
+const PUBLIC_PATHS = [...AUTH_FORM_PATHS, "/terms", "/privacy"];
 const PUBLIC_API_PREFIXES = ["/api/auth", "/api/register"];
 
 export default auth((req) => {
@@ -12,7 +15,7 @@ export default auth((req) => {
   if (!req.auth && !isPublic) {
     return NextResponse.redirect(new URL("/auth/sign-in", req.nextUrl));
   }
-  if (req.auth && PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+  if (req.auth && AUTH_FORM_PATHS.some((p) => pathname.startsWith(p))) {
     return NextResponse.redirect(new URL("/", req.nextUrl));
   }
 });

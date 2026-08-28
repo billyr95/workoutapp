@@ -12,6 +12,7 @@ export default function SignUpPage() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -51,6 +52,11 @@ export default function SignUpPage() {
           <h1 className="font-display text-4xl leading-none mt-3">Create Account</h1>
         </div>
         <GoogleButton />
+        <p className="text-center font-label text-[10px] text-[var(--muted)] mt-2.5 leading-relaxed">
+          By continuing with Google you agree to our{" "}
+          <Link href="/terms" className="text-[var(--chalk-dim)] underline">Terms</Link> and{" "}
+          <Link href="/privacy" className="text-[var(--chalk-dim)] underline">Privacy Policy</Link>.
+        </p>
         <div className="flex items-center gap-3 my-4">
           <div className="flex-1 h-px bg-[var(--line)]" />
           <span className="font-label text-[10px] tracking-[0.15em] uppercase text-[var(--muted)]">or</span>
@@ -83,8 +89,23 @@ export default function SignUpPage() {
               minLength={8}
             />
           </div>
+          <label className="flex items-start gap-2 mb-3 font-label text-[11px] text-[var(--chalk-dim)] leading-snug cursor-pointer">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              required
+              className="!w-auto mt-0.5 shrink-0"
+            />
+            <span>
+              I agree to the{" "}
+              <Link href="/terms" className="text-[var(--chalk)] underline" onClick={(e) => e.stopPropagation()}>Terms of Service</Link>{" "}
+              and{" "}
+              <Link href="/privacy" className="text-[var(--chalk)] underline" onClick={(e) => e.stopPropagation()}>Privacy Policy</Link>.
+            </span>
+          </label>
           {error && <p className="font-label text-xs text-[var(--red)] mb-3">{error}</p>}
-          <button type="submit" className="btn w-full" disabled={loading}>
+          <button type="submit" className="btn w-full" disabled={loading || !agreed}>
             {loading ? "Creating account…" : "Sign Up"}
           </button>
         </form>
