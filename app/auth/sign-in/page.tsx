@@ -35,12 +35,6 @@ export default function SignInPage() {
           <img src="/brand/repra-full-logo.svg" alt="Repra" className="h-8 w-auto mx-auto" />
           <h1 className="font-display text-4xl leading-none mt-3">Sign In</h1>
         </div>
-        <GoogleButton />
-        <div className="flex items-center gap-3 my-4">
-          <div className="flex-1 h-px bg-[var(--line)]" />
-          <span className="font-label text-[10px] tracking-[0.15em] uppercase text-[var(--muted)]">or</span>
-          <div className="flex-1 h-px bg-[var(--line)]" />
-        </div>
         <form onSubmit={handleSubmit} className="card">
           <div className="mb-3">
             <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
@@ -49,9 +43,12 @@ export default function SignInPage() {
             <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
           {error && <p className="font-label text-xs text-[var(--red)] mb-3">{error}</p>}
-          <button type="submit" className="btn w-full" disabled={loading}>
-            {loading ? "Signing in…" : "Sign In"}
-          </button>
+          <div className="flex gap-2">
+            <button type="submit" className="btn flex-1" disabled={loading}>
+              {loading ? "Signing in…" : "Sign In"}
+            </button>
+            <GoogleButton compact fullWidth={false} />
+          </div>
         </form>
         <p className="text-center font-label text-xs text-[var(--muted)] mt-4">
           No account? <Link href="/auth/sign-up" className="text-[var(--chalk)] underline">Sign up</Link>

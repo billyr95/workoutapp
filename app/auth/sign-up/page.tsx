@@ -51,17 +51,6 @@ export default function SignUpPage() {
           <img src="/brand/repra-full-logo.svg" alt="Repra" className="h-8 w-auto mx-auto" />
           <h1 className="font-display text-4xl leading-none mt-3">Create Account</h1>
         </div>
-        <GoogleButton />
-        <p className="text-center font-label text-[10px] text-[var(--muted)] mt-2.5 leading-relaxed">
-          By continuing with Google you agree to our{" "}
-          <Link href="/terms" className="text-[var(--chalk-dim)] underline">Terms</Link> and{" "}
-          <Link href="/privacy" className="text-[var(--chalk-dim)] underline">Privacy Policy</Link>.
-        </p>
-        <div className="flex items-center gap-3 my-4">
-          <div className="flex-1 h-px bg-[var(--line)]" />
-          <span className="font-label text-[10px] tracking-[0.15em] uppercase text-[var(--muted)]">or</span>
-          <div className="flex-1 h-px bg-[var(--line)]" />
-        </div>
         <form onSubmit={handleSubmit} className="card">
           <div className="mb-3">
             <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required />
@@ -105,9 +94,12 @@ export default function SignUpPage() {
             </span>
           </label>
           {error && <p className="font-label text-xs text-[var(--red)] mb-3">{error}</p>}
-          <button type="submit" className="btn w-full" disabled={loading || !agreed}>
-            {loading ? "Creating account…" : "Sign Up"}
-          </button>
+          <div className="flex gap-2">
+            <button type="submit" className="btn flex-1" disabled={loading || !agreed}>
+              {loading ? "Creating account…" : "Sign Up"}
+            </button>
+            <GoogleButton compact fullWidth={false} disabled={!agreed} />
+          </div>
         </form>
         <p className="text-center font-label text-xs text-[var(--muted)] mt-4">
           Already have an account? <Link href="/auth/sign-in" className="text-[var(--chalk)] underline">Sign in</Link>

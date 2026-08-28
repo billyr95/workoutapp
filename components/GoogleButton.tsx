@@ -2,15 +2,24 @@
 
 import { signIn } from "next-auth/react";
 
-export default function GoogleButton() {
+export default function GoogleButton({
+  compact = false,
+  disabled = false,
+  fullWidth = true,
+}: {
+  compact?: boolean;
+  disabled?: boolean;
+  fullWidth?: boolean;
+}) {
   return (
     <button
       type="button"
       onClick={() => signIn("google", { callbackUrl: "/" })}
-      className="btn-ghost w-full rounded flex items-center justify-center gap-2.5"
+      disabled={disabled}
+      className={`btn-ghost rounded !py-2.5 !px-4 !text-[12px] font-semibold tracking-[0.08em] uppercase flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed ${fullWidth ? "w-full" : "flex-1"}`}
     >
       <GoogleIcon />
-      Continue with Google
+      {compact ? "Google" : "Continue with Google"}
     </button>
   );
 }
