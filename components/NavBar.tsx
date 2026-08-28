@@ -44,6 +44,14 @@ function ProgressIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+function FeedIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...IconProps(props)}>
+      <polyline points="2.5 13 7.5 13 9.5 7 13.5 19 16.5 13 21.5 13" />
+    </svg>
+  );
+}
+
 function SearchIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...IconProps(props)}>
@@ -66,6 +74,7 @@ const TABS = [
   { href: "/", label: "Today", Icon: TodayIcon },
   { href: "/schedule", label: "Schedule", Icon: ScheduleIcon },
   { href: "/progress", label: "Progress", Icon: ProgressIcon },
+  { href: "/feed", label: "Feed", Icon: FeedIcon },
   { href: "/search", label: "Search", Icon: SearchIcon },
   { href: "/profile", label: "Profile", Icon: ProfileIcon },
 ];
