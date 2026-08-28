@@ -291,11 +291,13 @@ export default function SchedulePage() {
                   </span>
                 </div>
               ))}
-              <div className="flex gap-2 mt-3">
-                <input placeholder="Exercise name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                <input type="number" placeholder="Sets" className="max-w-[70px]" value={form.sets} onChange={(e) => setForm({ ...form, sets: e.target.value })} />
-                <input type="number" placeholder="Min reps" className="max-w-[80px]" value={form.repMin} onChange={(e) => setForm({ ...form, repMin: e.target.value })} />
-                <input type="number" placeholder="Max reps" className="max-w-[80px]" value={form.repMax} onChange={(e) => setForm({ ...form, repMax: e.target.value })} />
+              <div className="mt-3">
+                <input placeholder="Exercise name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mb-2" />
+                <div className="flex gap-2">
+                  <input type="number" placeholder="Sets" value={form.sets} onChange={(e) => setForm({ ...form, sets: e.target.value })} />
+                  <input type="number" placeholder="Min reps" value={form.repMin} onChange={(e) => setForm({ ...form, repMin: e.target.value })} />
+                  <input type="number" placeholder="Max reps" value={form.repMax} onChange={(e) => setForm({ ...form, repMax: e.target.value })} />
+                </div>
               </div>
               <div className="flex gap-2 mt-2.5">
                 <button className="btn !py-1.5 !px-3 !text-[11px]" onClick={addExercise}>Add Exercise</button>

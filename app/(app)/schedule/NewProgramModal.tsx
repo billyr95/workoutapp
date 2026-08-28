@@ -540,12 +540,14 @@ function WorkoutEditor({ exercises, onChange }: { exercises: ProgramExercise[]; 
         </div>
       ))}
 
-      <div className="flex gap-1.5 mt-1.5">
-        <input placeholder="Exercise" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="!text-[11px]" />
-        <input type="number" placeholder="Sets" value={form.sets} onChange={(e) => setForm({ ...form, sets: e.target.value })} className="max-w-[55px] !text-[11px]" />
-        <input type="number" placeholder="Min" value={form.repMin} onChange={(e) => setForm({ ...form, repMin: e.target.value })} className="max-w-[55px] !text-[11px]" />
-        <input type="number" placeholder="Max" value={form.repMax} onChange={(e) => setForm({ ...form, repMax: e.target.value })} className="max-w-[55px] !text-[11px]" />
-        <button className="btn !py-1 !px-2 !text-[10px] shrink-0" onClick={addFromForm}>Add</button>
+      <div className="mt-1.5">
+        <input placeholder="Exercise" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="!text-[11px] mb-1.5" />
+        <div className="flex gap-1.5">
+          <input type="number" placeholder="Sets" value={form.sets} onChange={(e) => setForm({ ...form, sets: e.target.value })} className="!text-[11px]" />
+          <input type="number" placeholder="Min" value={form.repMin} onChange={(e) => setForm({ ...form, repMin: e.target.value })} className="!text-[11px]" />
+          <input type="number" placeholder="Max" value={form.repMax} onChange={(e) => setForm({ ...form, repMax: e.target.value })} className="!text-[11px]" />
+          <button className="btn !py-1 !px-2 !text-[10px] shrink-0" onClick={addFromForm}>Add</button>
+        </div>
       </div>
 
       <input
