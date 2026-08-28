@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { withMinDuration } from "./minDuration";
 
 export type Exercise = {
   id: number;
@@ -97,11 +98,15 @@ export type AppData = {
 export function useAppData() {
   const [data, setData] = useState<AppData | null>(null);
   const [loading, setLoading] = useState(true);
+  // Only the page's first load (its loading-mark moment) gets the minimum-duration treatment —
+  // a manual refetch after saving something shouldn't re-trigger a forced animation delay.
+  const isInitialLoad = useRef(true);
 
   const refetch = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/bootstrap", { cache: "no-store" });
-    const json = await res.json();
+    const fetchJson = fetch("/api/bootstrap", { cache: "no-store" }).then((res) => res.json());
+    const json = isInitialLoad.current ? await withMinDuration(fetchJson) : await fetchJson;
+    isInitialLoad.current = false;
     setData(json);
     setLoading(false);
   }, []);

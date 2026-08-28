@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import LoadingMark from "@/components/LoadingMark";
+import { withMinDuration } from "@/lib/minDuration";
 
 type WorkoutDaySet = { exerciseName: string; setNumber: number; weight: number; reps: number };
 type WorkoutDay = { date: string; workoutName: string; sets: WorkoutDaySet[] };
@@ -40,6 +41,12 @@ function groupSetsByExercise(sets: WorkoutDaySet[]) {
 
 export default function PublicProfilePage() {
   const params = useParams<{ username: string }>();
+  // Keyed on username so navigating between two users' profiles remounts this component —
+  // state (profile, expanded day, etc.) resets cleanly instead of flashing stale data.
+  return <ProfileView key={params.username} username={params.username} />;
+}
+
+function ProfileView({ username }: { username: string }) {
   const [profile, setProfile] = useState<PublicProfile | null | "not-found">(null);
   const [followBusy, setFollowBusy] = useState(false);
   const [expandedDay, setExpandedDay] = useState<number | null>(null);
@@ -52,14 +59,12 @@ export default function PublicProfilePage() {
   };
 
   useEffect(() => {
-    fetch(`/api/users/${params.username}`).then(async (res) => {
-      if (!res.ok) {
-        setProfile("not-found");
-        return;
-      }
-      setProfile(await res.json());
+    const fetchProfile = fetch(`/api/users/${username}`).then(async (res) => {
+      if (!res.ok) return "not-found" as const;
+      return res.json();
     });
-  }, [params.username]);
+    withMinDuration(fetchProfile).then(setProfile);
+  }, [username]);
 
   if (profile === null) {
     return (
