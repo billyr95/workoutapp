@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import GoogleButton from "@/components/GoogleButton";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -33,6 +34,12 @@ export default function SignInPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/repra-full-logo.svg" alt="Repra" className="h-8 w-auto mx-auto" />
           <h1 className="font-display text-4xl leading-none mt-3">Sign In</h1>
+        </div>
+        <GoogleButton />
+        <div className="flex items-center gap-3 my-4">
+          <div className="flex-1 h-px bg-[var(--line)]" />
+          <span className="font-label text-[10px] tracking-[0.15em] uppercase text-[var(--muted)]">or</span>
+          <div className="flex-1 h-px bg-[var(--line)]" />
         </div>
         <form onSubmit={handleSubmit} className="card">
           <div className="mb-3">
