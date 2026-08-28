@@ -41,12 +41,12 @@ export default function SignInPage() {
           <div className="mb-3">
             <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
-          {error && <p className="font-mono text-xs text-[var(--red)] mb-3">{error}</p>}
+          {error && <p className="font-label text-xs text-[var(--red)] mb-3">{error}</p>}
           <button type="submit" className="btn w-full" disabled={loading}>
             {loading ? "Signing in…" : "Sign In"}
           </button>
         </form>
-        <p className="text-center font-mono text-xs text-[var(--muted)] mt-4">
+        <p className="text-center font-label text-xs text-[var(--muted)] mt-4">
           No account? <Link href="/auth/sign-up" className="text-[var(--chalk)] underline">Sign up</Link>
         </p>
       </div>

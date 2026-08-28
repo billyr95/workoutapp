@@ -204,21 +204,21 @@ export default function NewProgramModal({
       <div className="card w-full max-w-2xl my-8">
         <div className="flex items-center justify-between mb-3">
           <span className="font-display text-xl">New Program</span>
-          <button className="text-[var(--muted)] hover:text-[var(--chalk)] font-mono text-sm px-1" onClick={onClose}>✕</button>
+          <button className="text-[var(--muted)] hover:text-[var(--chalk)] font-label text-sm px-1" onClick={onClose}>✕</button>
         </div>
 
         {result ? (
           <div>
-            <p className="font-mono text-sm text-[var(--olive)] mb-2">Saved &ldquo;{result.program.name}&rdquo; to your library.</p>
+            <p className="font-label text-sm text-[var(--olive)] mb-2">Saved &ldquo;{result.program.name}&rdquo; to your library.</p>
             {result.warnings.length > 0 && (
               <div className="mb-3">
-                <p className="font-mono text-[11px] text-[var(--muted)] mb-1">A few entries were skipped:</p>
-                <ul className="font-mono text-[11px] text-[var(--muted)] list-disc pl-4 space-y-0.5">
+                <p className="font-label text-[11px] text-[var(--muted)] mb-1">A few entries were skipped:</p>
+                <ul className="font-label text-[11px] text-[var(--muted)] list-disc pl-4 space-y-0.5">
                   {result.warnings.map((w, i) => <li key={i}>{w}</li>)}
                 </ul>
               </div>
             )}
-            <p className="font-mono text-[11px] text-[var(--muted)] mb-3">
+            <p className="font-label text-[11px] text-[var(--muted)] mb-3">
               Select it from the dropdown and hit Load whenever you want to switch to it.
             </p>
             <button className="btn !py-1.5 !px-3 !text-[11px]" onClick={onClose}>Done</button>
@@ -252,9 +252,9 @@ export default function NewProgramModal({
               <div>
                 {generated ? (
                   <div>
-                    <p className="font-mono text-sm text-[var(--olive)] mb-1">&ldquo;{generated.name}&rdquo; is saved to your library.</p>
+                    <p className="font-label text-sm text-[var(--olive)] mb-1">&ldquo;{generated.name}&rdquo; is saved to your library.</p>
                     {generated.errors.length > 0 && (
-                      <ul className="font-mono text-[11px] text-[var(--muted)] list-disc pl-4 space-y-0.5 mb-2">
+                      <ul className="font-label text-[11px] text-[var(--muted)] list-disc pl-4 space-y-0.5 mb-2">
                         {generated.errors.map((w, i) => <li key={i}>{w}</li>)}
                       </ul>
                     )}
@@ -265,14 +265,14 @@ export default function NewProgramModal({
                           <div key={s.day} className="card !py-2.5 !px-3">
                             <div className="flex justify-between items-center">
                               <span className="font-display text-base w-24">{s.day}</span>
-                              <span className="font-mono text-xs text-[var(--chalk-dim)]">
+                              <span className="font-label text-xs text-[var(--chalk-dim)]">
                                 {s.workoutType}{s.category ? ` · ${s.category}` : ""}
                               </span>
                             </div>
                             {workout && workout.exercises.length > 0 && (
                               <div className="mt-1.5 pt-1.5 border-t border-[var(--line)]">
                                 {workout.exercises.map((ex) => (
-                                  <div key={ex.name} className="font-mono text-[11px] text-[var(--chalk-dim)]">
+                                  <div key={ex.name} className="font-label text-[11px] text-[var(--chalk-dim)]">
                                     {ex.name} — {ex.sets}×{ex.repMin}{ex.repMax !== ex.repMin ? `-${ex.repMax}` : ""}
                                   </div>
                                 ))}
@@ -294,7 +294,7 @@ export default function NewProgramModal({
                   </div>
                 ) : (
                   <div>
-                    <p className="font-mono text-[11px] text-[var(--chalk-dim)] mb-2">
+                    <p className="font-label text-[11px] text-[var(--chalk-dim)] mb-2">
                       Describe your goals, equipment, experience, and how many days a week you want to train — the AI designs the full week and saves it to your library.
                     </p>
                     <textarea
@@ -304,7 +304,7 @@ export default function NewProgramModal({
                       rows={4}
                       className="mb-2 resize-none"
                     />
-                    {generateError && <p className="font-mono text-[11px] text-[var(--red)] mb-2">{generateError}</p>}
+                    {generateError && <p className="font-label text-[11px] text-[var(--red)] mb-2">{generateError}</p>}
                     <div className="flex gap-2">
                       <button className="btn !py-1.5 !px-3 !text-[11px]" onClick={handleGenerate} disabled={generating}>
                         {generating ? "Designing your program…" : "Generate Program"}
@@ -337,15 +337,15 @@ export default function NewProgramModal({
               <div>
                 <input type="file" accept=".xml,text/xml" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} className="mb-2" />
                 {xmlFileName && !xmlParseError && xmlData && (
-                  <p className="font-mono text-[11px] text-[var(--olive)] mb-3">
+                  <p className="font-label text-[11px] text-[var(--olive)] mb-3">
                     Parsed {xmlFileName}: {xmlData.schedule.length} scheduled day{xmlData.schedule.length === 1 ? "" : "s"}, {xmlData.workouts.length} workout{xmlData.workouts.length === 1 ? "" : "s"}.
                   </p>
                 )}
-                {xmlParseError && <p className="font-mono text-[11px] text-[var(--red)] mb-3">{xmlParseError}</p>}
+                {xmlParseError && <p className="font-label text-[11px] text-[var(--red)] mb-3">{xmlParseError}</p>}
 
                 <details className="card !bg-[var(--surface2)] mb-1">
-                  <summary className="font-mono text-[11px] text-[var(--chalk-dim)] cursor-pointer">XML format &amp; example</summary>
-                  <div className="font-mono text-[11px] text-[var(--muted)] mt-2 space-y-1.5">
+                  <summary className="font-label text-[11px] text-[var(--chalk-dim)] cursor-pointer">XML format &amp; example</summary>
+                  <div className="font-label text-[11px] text-[var(--muted)] mt-2 space-y-1.5">
                     <p><code>&lt;program name=&quot;...&quot;&gt;</code> — optional, prefills the name field above.</p>
                     <p><code>&lt;schedule&gt;</code> holds up to one <code>&lt;day&gt;</code> per weekday: <code>name</code> (Sunday…Saturday), <code>type</code> (Rest, Cardio, or Workout), <code>workout</code> (required if type=Workout, must match a workout name below), <code>category</code> (Strength or Hypertrophy).</p>
                     <p><code>&lt;workouts&gt;</code> holds <code>&lt;workout name=&quot;...&quot;&gt;</code> elements, each containing <code>&lt;exercise&gt;</code> elements with attributes <code>name</code>, <code>sets</code>, <code>repMin</code>, <code>repMax</code>, and optional <code>restSeconds</code>.</p>
@@ -357,7 +357,7 @@ export default function NewProgramModal({
 
             {tab !== "ai" && (
               <>
-                {saveError && <p className="font-mono text-[11px] text-[var(--red)] mt-3">{saveError}</p>}
+                {saveError && <p className="font-label text-[11px] text-[var(--red)] mt-3">{saveError}</p>}
                 <div className="flex gap-2 mt-3.5">
                   <button className="btn !py-1.5 !px-3 !text-[11px]" onClick={handleSave} disabled={saving}>
                     {saving ? "Saving…" : "Save Program"}
@@ -389,16 +389,16 @@ function TemplateSearch({ onApply }: { onApply: (day: string, template: Communit
 
   return (
     <div className="card !bg-[var(--surface2)]">
-      <p className="font-mono text-[11px] text-[var(--chalk-dim)] mb-2">Community workout templates — drag onto a day, or pick one below.</p>
+      <p className="font-label text-[11px] text-[var(--chalk-dim)] mb-2">Community workout templates — drag onto a day, or pick one below.</p>
       <input placeholder="Search workouts (e.g. Push Day)" value={query} onChange={(e) => setQuery(e.target.value)} className="mb-2" />
       <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto">
-        {results.length === 0 && <p className="font-mono text-[11px] text-[var(--muted)]">No matches yet.</p>}
+        {results.length === 0 && <p className="font-label text-[11px] text-[var(--muted)]">No matches yet.</p>}
         {results.map((r) => (
           <div
             key={r.id}
             draggable
             onDragStart={(e) => e.dataTransfer.setData("text/plain", JSON.stringify({ kind: "workout-template", ...r }))}
-            className="flex items-center justify-between gap-2 font-mono text-[11px] bg-[var(--surface)] border border-[var(--line)] rounded px-2 py-1.5 cursor-grab"
+            className="flex items-center justify-between gap-2 font-label text-[11px] bg-[var(--surface)] border border-[var(--line)] rounded px-2 py-1.5 cursor-grab"
           >
             <span className="truncate">{r.name} <span className="text-[var(--muted)]">· {r.exercises.length} exercises</span></span>
             <select
@@ -533,7 +533,7 @@ function WorkoutEditor({ exercises, onChange }: { exercises: ProgramExercise[]; 
       }}
     >
       {exercises.map((ex, i) => (
-        <div key={i} className="flex items-center gap-2 font-mono text-[11px] mb-1">
+        <div key={i} className="flex items-center gap-2 font-label text-[11px] mb-1">
           <span className="flex-1 truncate">{ex.name}</span>
           <span className="text-[var(--chalk-dim)]">{ex.sets}×{ex.repMin}{ex.repMax !== ex.repMin ? `-${ex.repMax}` : ""}</span>
           <span className="text-[var(--muted)] hover:text-[var(--red)] cursor-pointer px-1" onClick={() => removeExercise(i)}>✕</span>
@@ -566,7 +566,7 @@ function WorkoutEditor({ exercises, onChange }: { exercises: ProgramExercise[]; 
                   JSON.stringify({ kind: "exercise", name: r.name, sets: r.sets, repMin: r.repMin, repMax: r.repMax, restSeconds: r.restSeconds })
                 )
               }
-              className="flex items-center justify-between gap-2 font-mono text-[11px] bg-[var(--surface)] border border-[var(--line)] rounded px-2 py-1 cursor-grab"
+              className="flex items-center justify-between gap-2 font-label text-[11px] bg-[var(--surface)] border border-[var(--line)] rounded px-2 py-1 cursor-grab"
             >
               <span className="truncate">{r.name} <span className="text-[var(--muted)]">· {r.sets}×{r.repMin}{r.repMax !== r.repMin ? `-${r.repMax}` : ""}</span></span>
               <button

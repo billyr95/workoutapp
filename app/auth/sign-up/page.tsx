@@ -76,12 +76,12 @@ export default function SignUpPage() {
               minLength={8}
             />
           </div>
-          {error && <p className="font-mono text-xs text-[var(--red)] mb-3">{error}</p>}
+          {error && <p className="font-label text-xs text-[var(--red)] mb-3">{error}</p>}
           <button type="submit" className="btn w-full" disabled={loading}>
             {loading ? "Creating account…" : "Sign Up"}
           </button>
         </form>
-        <p className="text-center font-mono text-xs text-[var(--muted)] mt-4">
+        <p className="text-center font-label text-xs text-[var(--muted)] mt-4">
           Already have an account? <Link href="/auth/sign-in" className="text-[var(--chalk)] underline">Sign in</Link>
         </p>
       </div>

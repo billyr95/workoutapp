@@ -35,10 +35,10 @@ export default function SearchPage() {
         className="mb-4"
       />
 
-      {loading && <p className="font-mono text-xs text-[var(--muted)]">Searching…</p>}
+      {loading && <p className="font-label text-xs text-[var(--muted)]">Searching…</p>}
 
       {!loading && searched && results.length === 0 && (
-        <div className="card text-center text-[var(--muted)] font-mono text-xs">No users found.</div>
+        <div className="card text-center text-[var(--muted)] font-label text-xs">No users found.</div>
       )}
 
       {results.map((r) => (
@@ -56,8 +56,8 @@ export default function SearchPage() {
             )}
           </div>
           <div className="min-w-0">
-            <div className="font-mono text-[13px]">@{r.username}</div>
-            <div className="font-mono text-[11px] text-[var(--chalk-dim)] truncate">{r.name}</div>
+            <div className="font-label text-[13px]">@{r.username}</div>
+            <div className="font-label text-[11px] text-[var(--chalk-dim)] truncate">{r.name}</div>
           </div>
         </Link>
       ))}

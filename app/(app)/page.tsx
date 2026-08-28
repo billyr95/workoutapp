@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useAppData, Exercise } from "@/lib/useAppData";
+import LoadingMark from "@/components/LoadingMark";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -75,7 +76,11 @@ export default function TodayPage() {
   }, [workoutId, draft, skipped]);
 
   if (loading || !data) {
-    return <p className="font-mono text-sm text-[var(--muted)]">Loading…</p>;
+    return (
+      <div className="flex justify-center py-16">
+        <LoadingMark className="h-10 w-auto" />
+      </div>
+    );
   }
 
   function lastSetsFor(exerciseId: number) {
@@ -172,12 +177,12 @@ export default function TodayPage() {
         ))}
       </select>
 
-      {!sched && <div className="card text-center text-[var(--muted)] font-mono text-xs">No session scheduled.</div>}
+      {!sched && <div className="card text-center text-[var(--muted)] font-label text-xs">No session scheduled.</div>}
 
       {sched?.workoutType === "Rest" && (
         <div className="card text-center">
           <div className="font-display text-3xl">Rest Day</div>
-          <div className="font-mono text-xs text-[var(--chalk-dim)] mt-1">
+          <div className="font-label text-xs text-[var(--chalk-dim)] mt-1">
             Recovery is training. Eat your protein, sleep 8 hours.
           </div>
         </div>
@@ -186,7 +191,7 @@ export default function TodayPage() {
       {sched?.workoutType === "Cardio" && (
         <div className="card">
           <div className="font-display text-2xl">Cardio</div>
-          <div className="font-mono text-xs text-[var(--chalk-dim)] mb-3">Log today&apos;s session</div>
+          <div className="font-label text-xs text-[var(--chalk-dim)] mb-3">Log today&apos;s session</div>
           <div className="flex gap-2 mb-2">
             <input placeholder="Type (e.g. Bike, Run)" value={cardioForm.type} onChange={(e) => setCardioForm({ ...cardioForm, type: e.target.value })} />
             <input type="number" placeholder="Minutes" value={cardioForm.durationMinutes} onChange={(e) => setCardioForm({ ...cardioForm, durationMinutes: e.target.value })} />
@@ -207,11 +212,11 @@ export default function TodayPage() {
               {sched.category}
             </span>
             <div className="font-display text-3xl mt-1">{sched.workoutType}</div>
-            <div className="font-mono text-xs text-[var(--chalk-dim)]">{workout.exercises.length} exercises</div>
+            <div className="font-label text-xs text-[var(--chalk-dim)]">{workout.exercises.length} exercises</div>
           </div>
 
           {workout.exercises.length === 0 && (
-            <div className="card text-center text-[var(--muted)] font-mono text-xs">
+            <div className="card text-center text-[var(--muted)] font-label text-xs">
               No exercises set for {sched.workoutType} yet. Add them in the Schedule tab.
             </div>
           )}
@@ -236,7 +241,7 @@ export default function TodayPage() {
       )}
 
       {toast && (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-[var(--olive)] text-[#101410] font-mono text-xs px-4 py-2.5 rounded-md z-50">
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-[var(--olive)] text-[#101410] font-label text-xs px-4 py-2.5 rounded-md z-50">
           {toast}
         </div>
       )}
@@ -283,7 +288,7 @@ function ExerciseCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="font-display text-xl">{exercise.name}</div>
-          <div className="font-mono text-[11px] text-[var(--chalk-dim)] mb-2">
+          <div className="font-label text-[11px] text-[var(--chalk-dim)] mb-2">
             {exercise.sets} sets · {exercise.repMin}
             {exercise.repMax !== exercise.repMin ? `–${exercise.repMax}` : ""} reps
             {exercise.restSeconds ? ` · ${exercise.restSeconds}s rest` : ""}
@@ -293,12 +298,12 @@ function ExerciseCard({
         </div>
         <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
           <input type="checkbox" checked={skipped} onChange={onToggleSkip} className="!w-auto" />
-          <span className="font-mono text-[11px] text-[var(--chalk-dim)]">Skip</span>
+          <span className="font-label text-[11px] text-[var(--chalk-dim)]">Skip</span>
         </label>
       </div>
 
       {skipped ? (
-        <div className="text-center text-[var(--muted)] font-mono text-xs py-2">Skipped — won&apos;t be logged.</div>
+        <div className="text-center text-[var(--muted)] font-label text-xs py-2">Skipped — won&apos;t be logged.</div>
       ) : (
         Array.from({ length: exercise.sets }).map((_, i) => {
           const lastW = lastSets?.[i]?.weight;
@@ -311,7 +316,7 @@ function ExerciseCard({
           const repsValue = repsTouched ? draft[i]!.reps : clearedFields.has(repsKey) ? "" : lastR ?? "";
           return (
             <div key={i} className="grid grid-cols-[26px_1fr_1fr] gap-2 items-center mb-1.5">
-              <span className="font-mono text-xs text-[var(--muted)]">{i + 1}</span>
+              <span className="font-label text-xs text-[var(--muted)]">{i + 1}</span>
               <input
                 type="number"
                 step="0.1"

@@ -37,7 +37,7 @@ html, body {
   text-transform: uppercase;
 }
 
-.font-mono {
+.font-label {
   font-family: 'Manrope', sans-serif;
 }
 
@@ -102,4 +102,12 @@ input::placeholder { color: var(--muted); }
   flex: 1;
   height: 1px;
   background: var(--line);
+}
+
+@keyframes loading-mark-fill {
+  from { y: 180.48px; height: 0px; }
+  to { y: 0px; height: 180.48px; }
+}
+.loading-mark-fill {
+  animation: loading-mark-fill 1.3s cubic-bezier(0.65, 0, 0.35, 1) infinite alternate;
 }

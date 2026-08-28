@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useAppData } from "@/lib/useAppData";
+import LoadingMark from "@/components/LoadingMark";
 
 export default function ProfilePage() {
   const { data, loading, refetch } = useAppData();
@@ -15,7 +16,13 @@ export default function ProfilePage() {
     setTimeout(() => setToast(null), 2000);
   };
 
-  if (loading || !data) return <p className="font-mono text-sm text-[var(--muted)]">Loading…</p>;
+  if (loading || !data) {
+    return (
+      <div className="flex justify-center py-16">
+        <LoadingMark className="h-10 w-auto" />
+      </div>
+    );
+  }
 
   const u = data.user;
 
@@ -71,9 +78,9 @@ export default function ProfilePage() {
         />
         <div className="min-w-0">
           <div className="font-display text-xl truncate">{u.name}</div>
-          {u.username && <div className="font-mono text-xs text-[var(--chalk-dim)]">@{u.username}</div>}
+          {u.username && <div className="font-label text-xs text-[var(--chalk-dim)]">@{u.username}</div>}
           <button
-            className="font-mono text-[10px] text-[var(--muted)] hover:text-[var(--chalk)] mt-1"
+            className="font-label text-[10px] text-[var(--muted)] hover:text-[var(--chalk)] mt-1"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
           >
@@ -84,7 +91,7 @@ export default function ProfilePage() {
 
       {u.username && (
         <Link href={`/u/${u.username}`} className="block card mb-4 text-center hover:border-[var(--chalk-dim)]">
-          <span className="font-mono text-xs text-[var(--chalk)]">View my public profile →</span>
+          <span className="font-label text-xs text-[var(--chalk)]">View my public profile →</span>
         </Link>
       )}
 
@@ -103,7 +110,7 @@ export default function ProfilePage() {
       <div className="section-label mb-3">Goal</div>
       <div className="card mb-4">
         <div className="font-display text-xl">{u.goalText}</div>
-        <div className="font-mono text-xs text-[var(--chalk-dim)] mt-1">
+        <div className="font-label text-xs text-[var(--chalk-dim)] mt-1">
           {u.heightFeet}&apos;{u.heightInches}&quot; · Start {u.startingWeight}lb → Goal {u.goalWeight}lb
         </div>
       </div>
@@ -118,12 +125,12 @@ export default function ProfilePage() {
 
       <div className="section-label mb-3">Recent Cardio</div>
       {data.cardioLogs.length === 0 ? (
-        <div className="card text-center text-[var(--muted)] font-mono text-xs">No cardio logged yet.</div>
+        <div className="card text-center text-[var(--muted)] font-label text-xs">No cardio logged yet.</div>
       ) : (
         data.cardioLogs.slice(0, 5).map((c) => (
           <div key={c.id} className="card !py-3 !px-4 flex justify-between mb-2">
-            <span className="font-mono text-xs">{c.date} · {c.type}</span>
-            <span className="font-mono text-xs text-[var(--chalk-dim)]">
+            <span className="font-label text-xs">{c.date} · {c.type}</span>
+            <span className="font-label text-xs text-[var(--chalk-dim)]">
               {c.durationMinutes}min{c.calories ? ` · ${c.calories}cal` : ""}
             </span>
           </div>
@@ -131,7 +138,7 @@ export default function ProfilePage() {
       )}
 
       {toast && (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-[var(--olive)] text-[#101410] font-mono text-xs px-4 py-2.5 rounded-md z-50">
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-[var(--olive)] text-[#101410] font-label text-xs px-4 py-2.5 rounded-md z-50">
           {toast}
         </div>
       )}
@@ -142,7 +149,7 @@ export default function ProfilePage() {
 function PrivacyToggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
   return (
     <label className="flex items-center justify-between gap-2 py-1.5 cursor-pointer">
-      <span className="font-mono text-xs text-[var(--chalk-dim)]">{label}</span>
+      <span className="font-label text-xs text-[var(--chalk-dim)]">{label}</span>
       <input type="checkbox" checked={checked} onChange={onChange} className="!w-auto" />
     </label>
   );
@@ -152,7 +159,7 @@ function MacroBar({ label, value, scale, unit }: { label: string; value: number;
   const pct = Math.min(100, Math.round((value / scale) * 100));
   return (
     <div className="mb-3">
-      <div className="flex justify-between font-mono text-xs">
+      <div className="flex justify-between font-label text-xs">
         <span className="text-[var(--chalk-dim)]">{label}</span>
         <span>{value}{unit || ""}</span>
       </div>

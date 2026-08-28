@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import LoadingMark from "@/components/LoadingMark";
 
 type WorkoutDaySet = { exerciseName: string; setNumber: number; weight: number; reps: number };
 type WorkoutDay = { date: string; workoutName: string; sets: WorkoutDaySet[] };
@@ -60,9 +61,15 @@ export default function PublicProfilePage() {
     });
   }, [params.username]);
 
-  if (profile === null) return <p className="font-mono text-sm text-[var(--muted)]">Loading…</p>;
+  if (profile === null) {
+    return (
+      <div className="flex justify-center py-16">
+        <LoadingMark className="h-10 w-auto" />
+      </div>
+    );
+  }
   if (profile === "not-found") {
-    return <div className="card text-center text-[var(--muted)] font-mono text-xs">No user found with that username.</div>;
+    return <div className="card text-center text-[var(--muted)] font-label text-xs">No user found with that username.</div>;
   }
 
   async function toggleFollow() {
@@ -110,8 +117,8 @@ export default function PublicProfilePage() {
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-display text-xl truncate">{profile.name}</div>
-          <div className="font-mono text-xs text-[var(--chalk-dim)]">@{profile.username}</div>
-          <div className="font-mono text-[11px] text-[var(--muted)] mt-1">
+          <div className="font-label text-xs text-[var(--chalk-dim)]">@{profile.username}</div>
+          <div className="font-label text-[11px] text-[var(--muted)] mt-1">
             {profile.followerCount} follower{profile.followerCount === 1 ? "" : "s"} · {profile.followingCount} following
           </div>
         </div>
@@ -127,7 +134,7 @@ export default function PublicProfilePage() {
       </div>
 
       {nothingShared && (
-        <div className="card text-center text-[var(--muted)] font-mono text-xs">
+        <div className="card text-center text-[var(--muted)] font-label text-xs">
           {profile.isSelf ? "You haven't shared any details publicly yet — turn on visibility in Profile settings." : "This user hasn't shared any details yet."}
         </div>
       )}
@@ -137,7 +144,7 @@ export default function PublicProfilePage() {
           <div className="section-label mb-3">Current Weight</div>
           <div className="card mb-4">
             <div className="font-display text-3xl">{profile.weight.value}lb</div>
-            <div className="font-mono text-xs text-[var(--chalk-dim)]">as of {profile.weight.date}</div>
+            <div className="font-label text-xs text-[var(--chalk-dim)]">as of {profile.weight.date}</div>
           </div>
         </>
       )}
@@ -155,8 +162,8 @@ export default function PublicProfilePage() {
                     className="flex justify-between w-full text-left"
                     onClick={() => hasSets && setExpandedDay(isOpen ? null : i)}
                   >
-                    <span className="font-mono text-xs">{d.date}</span>
-                    <span className="font-mono text-xs text-[var(--chalk-dim)] flex items-center gap-1.5">
+                    <span className="font-label text-xs">{d.date}</span>
+                    <span className="font-label text-xs text-[var(--chalk-dim)] flex items-center gap-1.5">
                       {d.workoutName}
                       {hasSets && <span className="text-[var(--muted)]">{isOpen ? "▲" : "▼"}</span>}
                     </span>
@@ -165,8 +172,8 @@ export default function PublicProfilePage() {
                     <div className="mt-2.5 pt-2.5 border-t border-[var(--line)]">
                       {groupSetsByExercise(d.sets).map((ex) => (
                         <div key={ex.name} className="flex justify-between mb-1 last:mb-0">
-                          <span className="font-mono text-[12px]">{ex.name}</span>
-                          <span className="font-mono text-[11px] text-[var(--chalk-dim)]">
+                          <span className="font-label text-[12px]">{ex.name}</span>
+                          <span className="font-label text-[11px] text-[var(--chalk-dim)]">
                             {ex.sets.map((s) => `${s.weight}×${s.reps}`).join(", ")}
                           </span>
                         </div>
@@ -201,7 +208,7 @@ export default function PublicProfilePage() {
                 <div key={s.day} className="card !py-3 !px-3.5">
                   <div className="flex justify-between items-center">
                     <span className="font-display text-lg w-24">{s.day}</span>
-                    <span className="font-mono text-xs text-[var(--chalk-dim)]">
+                    <span className="font-label text-xs text-[var(--chalk-dim)]">
                       {s.workoutType}
                       {s.category ? ` · ${s.category}` : ""}
                     </span>
@@ -209,7 +216,7 @@ export default function PublicProfilePage() {
                   {workout && workout.exercises.length > 0 && (
                     <div className="mt-2 pt-2 border-t border-[var(--line)]">
                       {workout.exercises.map((ex) => (
-                        <div key={ex.name} className="font-mono text-[11px] text-[var(--chalk-dim)]">
+                        <div key={ex.name} className="font-label text-[11px] text-[var(--chalk-dim)]">
                           {ex.name} — {ex.sets}×{ex.repMin}
                           {ex.repMax !== ex.repMin ? `-${ex.repMax}` : ""}
                         </div>
@@ -228,8 +235,8 @@ export default function PublicProfilePage() {
           <div className="section-label mb-3 mt-4">Maxes</div>
           {profile.maxes.map((m) => (
             <div key={m.exerciseName} className="card !py-3 !px-4 flex justify-between items-center mb-2">
-              <span className="font-mono text-[13px]">{m.exerciseName}</span>
-              <span className="font-mono text-[11px] uppercase tracking-wide text-[var(--olive)]">
+              <span className="font-label text-[13px]">{m.exerciseName}</span>
+              <span className="font-label text-[11px] uppercase tracking-wide text-[var(--olive)]">
                 {m.weight}lb × {m.reps} — {m.date}
               </span>
             </div>
@@ -238,7 +245,7 @@ export default function PublicProfilePage() {
       )}
 
       {toast && (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-[var(--olive)] text-[#101410] font-mono text-xs px-4 py-2.5 rounded-md z-50">
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-[var(--olive)] text-[#101410] font-label text-xs px-4 py-2.5 rounded-md z-50">
           {toast}
         </div>
       )}

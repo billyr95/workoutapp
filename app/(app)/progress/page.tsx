@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useAppData, AppData } from "@/lib/useAppData";
+import LoadingMark from "@/components/LoadingMark";
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -109,7 +110,13 @@ export default function ProgressPage() {
     setTimeout(() => setToast(null), 2000);
   };
 
-  if (loading || !data) return <p className="font-mono text-sm text-[var(--muted)]">Loading…</p>;
+  if (loading || !data) {
+    return (
+      <div className="flex justify-center py-16">
+        <LoadingMark className="h-10 w-auto" />
+      </div>
+    );
+  }
 
   const allWeights = [...data.weightLogs].sort((a, b) => a.date.localeCompare(b.date));
   const weights = rangeStart ? allWeights.filter((w) => w.date >= rangeStart) : allWeights;
@@ -199,10 +206,10 @@ export default function ProgressPage() {
 
       <div className="section-label mb-3 mt-5">Personal Records</div>
       {data.personalRecords.length === 0 ? (
-        <div className="card text-center text-[var(--muted)] font-mono text-xs">No PRs logged yet.</div>
+        <div className="card text-center text-[var(--muted)] font-label text-xs">No PRs logged yet.</div>
       ) : (
         <>
-          <p className="font-mono text-[11px] text-[var(--muted)] mb-2">Tap a lift to graph it above — pick up to {MAX_SELECTED_LIFTS}.</p>
+          <p className="font-label text-[11px] text-[var(--muted)] mb-2">Tap a lift to graph it above — pick up to {MAX_SELECTED_LIFTS}.</p>
           {data.personalRecords.map((p) => {
             const chartable = liftSeries.has(p.exerciseName);
             const active = effectiveSelected.includes(p.exerciseName);
@@ -219,11 +226,11 @@ export default function ProgressPage() {
                   background: active ? "color-mix(in srgb, " + color + " 10%, var(--surface))" : "var(--surface)",
                 }}
               >
-                <span className="font-mono text-[13px] flex items-center gap-2">
+                <span className="font-label text-[13px] flex items-center gap-2">
                   {chartable && <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ background: color, opacity: active ? 1 : 0.35 }} />}
                   {p.exerciseName}
                 </span>
-                <span className="font-mono text-[11px] uppercase tracking-wide text-[var(--olive)]">
+                <span className="font-label text-[11px] uppercase tracking-wide text-[var(--olive)]">
                   {p.weight}lb × {p.reps} — {p.date}
                 </span>
               </button>
@@ -250,7 +257,7 @@ export default function ProgressPage() {
       </div>
 
       {toast && (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-[var(--olive)] text-[#101410] font-mono text-xs px-4 py-2.5 rounded-md z-50">
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-[var(--olive)] text-[#101410] font-label text-xs px-4 py-2.5 rounded-md z-50">
           {toast}
         </div>
       )}
@@ -285,7 +292,7 @@ function WeeklyReview() {
     <div className="card mb-3.5 !border-[var(--olive)]">
       <div className="section-label mb-2 !text-[var(--olive)]">Coach&apos;s Take</div>
       {state.status === "loading" ? (
-        <p className="font-mono text-xs text-[var(--muted)]">Reviewing your week…</p>
+        <p className="font-label text-xs text-[var(--muted)]">Reviewing your week…</p>
       ) : (
         <p className="text-[13px] leading-relaxed">{state.content}</p>
       )}
@@ -314,7 +321,7 @@ type Hover = { x: number; y: number; title: string; subtitle?: string };
 function ChartTooltip({ x, y, w, h, title, subtitle }: { x: number; y: number; w: number; h: number; title: string; subtitle?: string }) {
   return (
     <div
-      className="pointer-events-none absolute bg-[var(--surface2)] border border-[var(--line)] rounded px-2 py-1.5 font-mono text-[11px] whitespace-nowrap shadow-lg z-10"
+      className="pointer-events-none absolute bg-[var(--surface2)] border border-[var(--line)] rounded px-2 py-1.5 font-label text-[11px] whitespace-nowrap shadow-lg z-10"
       style={{ left: `${clamp((x / w) * 100, 6, 94)}%`, top: `${(y / h) * 100}%`, transform: "translate(-50%, calc(-100% - 10px))" }}
     >
       <div className="text-[var(--chalk)] font-semibold">{title}</div>
@@ -329,7 +336,7 @@ function WeightChart({ weights, hasHistory }: { weights: { date: string; weight:
 
   if (weights.length < 2) {
     return (
-      <div className="text-center text-[var(--muted)] font-mono text-xs py-6">
+      <div className="text-center text-[var(--muted)] font-label text-xs py-6">
         {hasHistory ? "No weigh-ins in this range — try a wider range." : "Log a few more weigh-ins to see your trend."}
       </div>
     );
@@ -444,7 +451,7 @@ function LiftProgressChart({ series, selected }: { series: Map<string, LiftPoint
 
   if (active.length === 0) {
     return (
-      <div className="text-center text-[var(--muted)] font-mono text-xs py-6">
+      <div className="text-center text-[var(--muted)] font-label text-xs py-6">
         {selected.length === 0 ? "Select a lift above to see its progress over time." : "No data for the selected lift(s) in this range — try a wider range."}
       </div>
     );
@@ -568,7 +575,7 @@ function LiftProgressChart({ series, selected }: { series: Map<string, LiftPoint
         {active.map((s) => (
           <div key={s.name} className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ background: colorForLift(s.name) }} />
-            <span className="font-mono text-[11px] text-[var(--chalk-dim)]">{s.name}</span>
+            <span className="font-label text-[11px] text-[var(--chalk-dim)]">{s.name}</span>
           </div>
         ))}
       </div>

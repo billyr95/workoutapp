@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAppData } from "@/lib/useAppData";
 import NewProgramModal from "./NewProgramModal";
+import LoadingMark from "@/components/LoadingMark";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -42,7 +43,13 @@ export default function SchedulePage() {
   const editingWorkout = data && editingSched ? data.workouts.find((w) => w.name === editingSched.workoutType) : null;
   const isConfigurableWorkout = !!(editingSched?.category && editingWorkout);
 
-  if (loading || !data) return <p className="font-mono text-sm text-[var(--muted)]">Loading…</p>;
+  if (loading || !data) {
+    return (
+      <div className="flex justify-center py-16">
+        <LoadingMark className="h-10 w-auto" />
+      </div>
+    );
+  }
 
   const today = DAYS[new Date().getDay()];
   const activeIdStr = data.user.activeProgramId != null ? String(data.user.activeProgramId) : null;
@@ -172,7 +179,7 @@ export default function SchedulePage() {
         )}
 
         {programs.length === 0 ? (
-          <p className="font-mono text-xs text-[var(--muted)]">No saved programs yet.</p>
+          <p className="font-label text-xs text-[var(--muted)]">No saved programs yet.</p>
         ) : (
           <div className="flex gap-2">
             <select value={effectiveProgramId} onChange={(e) => setSelectedProgramId(e.target.value)} className="flex-1">
@@ -193,7 +200,7 @@ export default function SchedulePage() {
             </button>
             {effectiveProgramId && (
               <span
-                className="text-[var(--muted)] hover:text-[var(--red)] cursor-pointer font-mono text-sm px-1 self-center"
+                className="text-[var(--muted)] hover:text-[var(--red)] cursor-pointer font-label text-sm px-1 self-center"
                 onClick={() => deleteProgram(Number(effectiveProgramId))}
                 title="Delete this saved program"
               >
@@ -216,7 +223,7 @@ export default function SchedulePage() {
               className={`flex justify-between items-center card !py-3 !px-3.5 text-left ${d === (editingDay ?? today) ? "!border-[var(--red)]" : ""}`}
             >
               <span className="font-display text-lg w-24">{d}</span>
-              <span className="font-mono text-xs text-[var(--chalk-dim)]">{label}</span>
+              <span className="font-label text-xs text-[var(--chalk-dim)]">{label}</span>
             </button>
           );
         })}
@@ -257,7 +264,7 @@ export default function SchedulePage() {
               </div>
             )}
             {dayForm.type === "Workout" && (
-              <p className="font-mono text-[10px] text-[var(--muted)] mb-2">
+              <p className="font-label text-[10px] text-[var(--muted)] mb-2">
                 Reuses one of your existing workouts if the name matches exactly.
               </p>
             )}
@@ -272,12 +279,12 @@ export default function SchedulePage() {
               <div className="font-display text-xl mb-2">{editingWorkout.name}</div>
               {editingWorkout.exercises.map((ex) => (
                 <div key={ex.id} className="flex items-center gap-2 mb-1.5">
-                  <span className="font-mono text-[13px] flex-[2]">{ex.name}</span>
-                  <span className="font-mono text-xs text-[var(--chalk-dim)] flex-1">
+                  <span className="font-label text-[13px] flex-[2]">{ex.name}</span>
+                  <span className="font-label text-xs text-[var(--chalk-dim)] flex-1">
                     {ex.sets}×{ex.repMin}-{ex.repMax}
                   </span>
                   <span
-                    className="text-[var(--muted)] hover:text-[var(--red)] cursor-pointer font-mono text-sm px-1.5"
+                    className="text-[var(--muted)] hover:text-[var(--red)] cursor-pointer font-label text-sm px-1.5"
                     onClick={() => removeExercise(ex.id)}
                   >
                     ✕
