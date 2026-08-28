@@ -73,24 +73,29 @@ const TABS = [
 export default function NavBar() {
   const pathname = usePathname();
   return (
-    <nav className="flex border-b border-[var(--line)] overflow-x-auto">
-      {TABS.map(({ href, label, Icon }) => {
-        const active = pathname === href;
-        return (
-          <Link
-            key={href}
-            href={href}
-            className={`flex-1 flex flex-col items-center gap-1 text-center font-label text-[11px] tracking-[0.1em] uppercase py-2.5 px-2 border-b-2 whitespace-nowrap transition-colors ${
-              active
-                ? "text-[var(--chalk)] border-[var(--red)]"
-                : "text-[var(--muted)] border-transparent hover:text-[var(--chalk)]"
-            }`}
-          >
-            <Icon className="h-[18px] w-[18px]" strokeWidth={active ? 2 : 1.8} />
-            {label}
-          </Link>
-        );
-      })}
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--line)] bg-[var(--bg)]"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
+      <div className="max-w-xl mx-auto flex overflow-x-auto">
+        {TABS.map(({ href, label, Icon }) => {
+          const active = pathname === href;
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={`flex-1 flex flex-col items-center gap-1 text-center font-label text-[11px] tracking-[0.1em] uppercase py-2.5 px-2 border-t-2 whitespace-nowrap transition-colors ${
+                active
+                  ? "text-[var(--chalk)] border-[var(--red)]"
+                  : "text-[var(--muted)] border-transparent hover:text-[var(--chalk)]"
+              }`}
+            >
+              <Icon className="h-[18px] w-[18px]" strokeWidth={active ? 2 : 1.8} />
+              {label}
+            </Link>
+          );
+        })}
+      </div>
     </nav>
   );
 }

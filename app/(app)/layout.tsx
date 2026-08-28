@@ -9,18 +9,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="max-w-xl mx-auto min-h-screen flex flex-col">
-      <header className="px-5 pt-6 pb-4 border-b border-[var(--line)] flex items-start justify-between gap-3">
-        <div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/repra-wordmark-white.svg" alt="Repra" className="h-5 w-auto" />
-          <h1 className="font-display text-4xl leading-none mt-2">
-            {session.user.name}&apos;s Log
-          </h1>
-        </div>
+      <header className="px-5 pt-6 pb-4 border-b border-[var(--line)] flex items-center justify-between gap-3">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/repra-full-logo.svg" alt="Repra" className="h-6 w-auto" />
         <SignOutButton />
       </header>
+      <main className="flex-1 px-5 py-5 pb-24">{children}</main>
       <NavBar />
-      <main className="flex-1 px-5 py-5">{children}</main>
     </div>
   );
 }

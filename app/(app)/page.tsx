@@ -163,6 +163,8 @@ export default function TodayPage() {
 
   return (
     <div>
+      <TodayInsight />
+
       <div className="section-label mb-3">Session</div>
       <select
         value={selectedDay}
@@ -244,6 +246,41 @@ export default function TodayPage() {
         <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-[var(--olive)] text-[#101410] font-label text-xs px-4 py-2.5 rounded-md z-50">
           {toast}
         </div>
+      )}
+    </div>
+  );
+}
+
+type InsightState = { status: "loading" } | { status: "ready"; content: string } | { status: "error" };
+
+function TodayInsight() {
+  const [state, setState] = useState<InsightState>({ status: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/today/insight")
+      .then(async (res) => {
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Couldn't load insight");
+        if (!cancelled) setState({ status: "ready", content: json.content });
+      })
+      .catch(() => {
+        if (!cancelled) setState({ status: "error" });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (state.status === "error") return null;
+
+  return (
+    <div className="card mb-3.5">
+      <div className="section-label mb-2">Insights</div>
+      {state.status === "loading" ? (
+        <p className="font-label text-xs text-[var(--muted)]">Reading your training data…</p>
+      ) : (
+        <p className="text-[13px] leading-relaxed">{state.content}</p>
       )}
     </div>
   );

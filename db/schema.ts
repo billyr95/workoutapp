@@ -160,3 +160,12 @@ export const aiReviews = pgTable("ai_reviews", {
   content: text("content").notNull(),
   createdAt: text("created_at").notNull(),
 });
+
+// One AI-generated Today-page insight per user per day, cached so it's not regenerated on every page load.
+export const dailyInsights = pgTable("daily_insights", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  date: text("date").notNull(),
+  content: text("content").notNull(),
+  createdAt: text("created_at").notNull(),
+});
