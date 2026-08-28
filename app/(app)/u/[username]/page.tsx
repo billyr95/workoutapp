@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import LoadingMark from "@/components/LoadingMark";
+import FollowListModal from "@/components/FollowListModal";
 import { withMinDuration } from "@/lib/minDuration";
 
 type WorkoutDaySet = { exerciseName: string; setNumber: number; weight: number; reps: number };
@@ -52,6 +53,7 @@ function ProfileView({ username }: { username: string }) {
   const [expandedDay, setExpandedDay] = useState<number | null>(null);
   const [savingProgram, setSavingProgram] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [listModal, setListModal] = useState<"followers" | "following" | null>(null);
 
   const flash = (msg: string) => {
     setToast(msg);
@@ -94,6 +96,20 @@ function ProfileView({ username }: { username: string }) {
     setFollowBusy(false);
   }
 
+  // Following/unfollowing someone from inside the followers/following modal can change this
+  // page's own counts (e.g. unfollowing someone from your own "following" list) — a quiet
+  // re-fetch on close keeps the numbers accurate without re-showing the loading mark.
+  async function refreshCounts() {
+    const res = await fetch(`/api/users/${username}`);
+    if (!res.ok) return;
+    const fresh = await res.json();
+    setProfile((prev) =>
+      prev && prev !== "not-found"
+        ? { ...prev, followerCount: fresh.followerCount, followingCount: fresh.followingCount, isFollowing: fresh.isFollowing }
+        : prev
+    );
+  }
+
   async function saveProgram() {
     if (profile === null || profile === "not-found" || !profile.username) return;
     setSavingProgram(true);
@@ -124,7 +140,13 @@ function ProfileView({ username }: { username: string }) {
           <div className="font-display text-xl truncate">{profile.name}</div>
           <div className="font-label text-xs text-[var(--chalk-dim)]">@{profile.username}</div>
           <div className="font-label text-[11px] text-[var(--muted)] mt-1">
-            {profile.followerCount} follower{profile.followerCount === 1 ? "" : "s"} · {profile.followingCount} following
+            <button onClick={() => setListModal("followers")} className="hover:text-[var(--chalk)] hover:underline underline-offset-2">
+              {profile.followerCount} follower{profile.followerCount === 1 ? "" : "s"}
+            </button>
+            {" · "}
+            <button onClick={() => setListModal("following")} className="hover:text-[var(--chalk)] hover:underline underline-offset-2">
+              {profile.followingCount} following
+            </button>
           </div>
         </div>
         {!profile.isSelf && (
@@ -253,6 +275,17 @@ function ProfileView({ username }: { username: string }) {
         <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-[var(--olive)] text-[#101410] font-label text-xs px-4 py-2.5 rounded-md z-50">
           {toast}
         </div>
+      )}
+
+      {listModal && (
+        <FollowListModal
+          username={username}
+          type={listModal}
+          onClose={() => {
+            setListModal(null);
+            refreshCounts();
+          }}
+        />
       )}
     </div>
   );

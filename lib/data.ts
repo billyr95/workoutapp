@@ -254,6 +254,30 @@ export async function getCommunityWorkouts(q?: string) {
   return filtered.sort((a, b) => b.useCount - a.useCount || a.name.localeCompare(b.name)).slice(0, 30);
 }
 
+// Who follows `targetId`, or who `targetId` follows — each entry annotated with whether
+// the viewer follows them, so the list can render a follow/unfollow button inline.
+export async function getConnections(targetId: number, direction: "followers" | "following", viewerId: number) {
+  const [allFollows, allUsers] = await Promise.all([db.select().from(schema.follows), db.select().from(schema.users)]);
+  const userById = new Map(allUsers.map((u) => [u.id, u]));
+
+  const relatedIds =
+    direction === "followers"
+      ? allFollows.filter((f) => f.followingId === targetId).map((f) => f.followerId)
+      : allFollows.filter((f) => f.followerId === targetId).map((f) => f.followingId);
+
+  return relatedIds
+    .map((id) => userById.get(id))
+    .filter((u): u is NonNullable<typeof u> => !!u)
+    .map((u) => ({
+      id: u.id,
+      username: u.username,
+      name: u.name,
+      avatarUrl: u.avatarUrl,
+      isSelf: u.id === viewerId,
+      isFollowing: allFollows.some((f) => f.followerId === viewerId && f.followingId === u.id),
+    }));
+}
+
 function clampInt(v: unknown, min: number, max: number): number | null {
   const n = typeof v === "string" ? Number(v) : v;
   if (typeof n !== "number" || !Number.isFinite(n)) return null;
