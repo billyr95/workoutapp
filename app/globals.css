@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 :root {
@@ -8,8 +8,8 @@
   --line: #37393d;
   --chalk: #e9e4d8;
   --chalk-dim: #a9a49a;
-  --red: #f5582a;
-  --red-dim: #6b2a17;
+  --red: #f05c44;
+  --red-dim: #7a2c1e;
   --olive: #6a7f57;
   --muted: #74777c;
 
@@ -27,17 +27,18 @@
 html, body {
   background: var(--bg);
   color: var(--chalk);
-  font-family: 'Inter', sans-serif;
+  font-family: 'Manrope', sans-serif;
 }
 
 .font-display {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 800;
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
 .font-mono {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Manrope', sans-serif;
 }
 
 input, select, textarea {
@@ -46,7 +47,7 @@ input, select, textarea {
   color: var(--chalk);
   border-radius: 4px;
   padding: 8px;
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Manrope', sans-serif;
   font-size: 13px;
   width: 100%;
 }
@@ -57,7 +58,7 @@ input:focus, select:focus, textarea:focus {
 input::placeholder { color: var(--muted); }
 
 .btn {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Manrope', sans-serif;
   font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -87,7 +88,7 @@ input::placeholder { color: var(--muted); }
 }
 
 .section-label {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'Manrope', sans-serif;
   font-size: 11px;
   letter-spacing: 0.15em;
   text-transform: uppercase;

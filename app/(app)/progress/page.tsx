@@ -382,8 +382,8 @@ function WeightChart({ weights, hasHistory }: { weights: { date: string; weight:
             <feDisplacementMap in="SourceGraphic" in2="noise" scale={3} />
           </filter>
           <linearGradient id="weightAreaFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#f5582a" stopOpacity={0.22} />
-            <stop offset="100%" stopColor="#f5582a" stopOpacity={0} />
+            <stop offset="0%" stopColor="#f05c44" stopOpacity={0.22} />
+            <stop offset="100%" stopColor="#f05c44" stopOpacity={0} />
           </linearGradient>
         </defs>
         {[min, mid, max].map((v, i) => {
@@ -391,7 +391,7 @@ function WeightChart({ weights, hasHistory }: { weights: { date: string; weight:
           return (
             <g key={i}>
               <line x1={pad} y1={y} x2={w - pad} y2={y} stroke="#37393d" strokeWidth={1} />
-              <text x={pad} y={y - 4} fill="#74777c" fontFamily="IBM Plex Mono" fontSize={10}>{Math.round(v)}lb</text>
+              <text x={pad} y={y - 4} fill="#74777c" fontFamily="Manrope" fontSize={10}>{Math.round(v)}lb</text>
             </g>
           );
         })}
@@ -399,7 +399,7 @@ function WeightChart({ weights, hasHistory }: { weights: { date: string; weight:
         <path d={path} fill="none" stroke="#e9e4d8" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" filter="url(#chalkFilter)" opacity={0.9} />
         {points.map(([x, y], i) => (
           <g key={i}>
-            <circle cx={x} cy={y} r={4} fill="#f5582a" stroke="var(--surface)" strokeWidth={2} />
+            <circle cx={x} cy={y} r={4} fill="#f05c44" stroke="var(--surface)" strokeWidth={2} />
             <circle
               cx={x}
               cy={y}
@@ -423,7 +423,7 @@ function WeightChart({ weights, hasHistory }: { weights: { date: string; weight:
         {tickIndices(weights.length).map((i) => {
           const anchor = i === 0 ? "start" : i === weights.length - 1 ? "end" : "middle";
           return (
-            <text key={i} x={points[i][0]} y={h - pad + 14} fill="#74777c" fontFamily="IBM Plex Mono" fontSize={9} textAnchor={anchor}>
+            <text key={i} x={points[i][0]} y={h - pad + 14} fill="#74777c" fontFamily="Manrope" fontSize={9} textAnchor={anchor}>
               {formatDate(weights[i].date)}
             </text>
           );
@@ -551,16 +551,16 @@ function LiftProgressChart({ series, selected }: { series: Map<string, LiftPoint
         {axisTicks.map((t, i) => {
           const anchor = i === 0 ? "start" : i === axisTicks.length - 1 ? "end" : "middle";
           return (
-            <text key={i} x={xForTime(t)} y={h - pad + 14} fill="var(--muted)" fontFamily="IBM Plex Mono" fontSize={9} textAnchor={anchor}>
+            <text key={i} x={xForTime(t)} y={h - pad + 14} fill="var(--muted)" fontFamily="Manrope" fontSize={9} textAnchor={anchor}>
               {formatDate(new Date(t).toISOString().slice(0, 10))}
             </text>
           );
         })}
         {[minW, midW, maxW].map((v, i) => (
-          <text key={i} x={pad} y={yFor(v) - 4} fill="var(--muted)" fontFamily="IBM Plex Mono" fontSize={10}>{Math.round(v)}lb</text>
+          <text key={i} x={pad} y={yFor(v) - 4} fill="var(--muted)" fontFamily="Manrope" fontSize={10}>{Math.round(v)}lb</text>
         ))}
         {endLabels.map((l, i) => (
-          <text key={i} x={l.x + 8} y={l.y + 3} fill="var(--chalk-dim)" fontFamily="IBM Plex Mono" fontSize={10}>{l.text}</text>
+          <text key={i} x={l.x + 8} y={l.y + 3} fill="var(--chalk-dim)" fontFamily="Manrope" fontSize={10}>{l.text}</text>
         ))}
       </svg>
       {hover && <ChartTooltip x={hover.x} y={hover.y} w={w} h={h} title={hover.title} subtitle={hover.subtitle} />}

@@ -1,10 +1,13 @@
 {
-  "name": "Billy's Training Log",
-  "short_name": "Training Log",
+  "name": "Repra",
+  "short_name": "Repra",
   "description": "Workout, cardio, and progress tracker",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#17181a",
-  "theme_color": "#c8102e",
-  "icons": []
+  "theme_color": "#f05c44",
+  "icons": [
+    { "src": "/brand/repra-icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/brand/repra-icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
 }

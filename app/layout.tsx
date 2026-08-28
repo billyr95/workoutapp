@@ -3,9 +3,13 @@ import "./globals.css";
 import Providers from "@/components/Providers";
 
 export const metadata: Metadata = {
-  title: "Training Log",
+  title: "Repra",
   description: "Workout, cardio, and progress tracker",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/brand/repra-icon-192.png",
+  },
 };
 
 export default function RootLayout({

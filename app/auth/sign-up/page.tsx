@@ -45,8 +45,9 @@ export default function SignUpPage() {
     <div className="max-w-xl mx-auto min-h-screen flex flex-col items-center justify-center px-5">
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
-          <div className="font-mono text-[11px] tracking-[0.18em] uppercase text-[var(--red)]">Training Log</div>
-          <h1 className="font-display text-4xl leading-none mt-1">Create Account</h1>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/repra-wordmark-white.svg" alt="Repra" className="h-5 w-auto mx-auto" />
+          <h1 className="font-display text-4xl leading-none mt-3">Create Account</h1>
         </div>
         <form onSubmit={handleSubmit} className="card">
           <div className="mb-3">
