@@ -7,17 +7,31 @@ import Link from "next/link";
 import LoadingMark from "@/components/LoadingMark";
 import { withMinDuration } from "@/lib/minDuration";
 
+type Actor = { username: string | null; name: string; avatarUrl: string | null };
 type ClientRelationship = {
   id: number;
   status: "pending" | "active";
   invitedAt: string;
-  client: { username: string | null; name: string; avatarUrl: string | null };
+  client: Actor;
+  lastWorkoutDate: string | null;
+  workoutsThisWeek: number;
+  flaggedCount: number;
 };
+type ActivityEvent =
+  | { type: "workout"; id: string; date: string; client: Actor; workoutName: string }
+  | { type: "cardio"; id: string; date: string; client: Actor; cardioType: string; durationMinutes: number }
+  | { type: "pr"; id: string; date: string; client: Actor; exerciseName: string; weight: number; reps: number };
+
+function formatDate(iso: string) {
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
 
 export default function CoachingPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [relationships, setRelationships] = useState<ClientRelationship[] | null>(null);
+  const [activity, setActivity] = useState<ActivityEvent[] | null>(null);
   const [username, setUsername] = useState("");
   const [inviting, setInviting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +43,7 @@ export default function CoachingPage() {
   const refetch = () => {
     const fetchClients = fetch("/api/coach/clients").then((res) => res.json());
     withMinDuration(fetchClients).then(setRelationships);
+    fetch("/api/coach/activity").then((res) => res.json()).then(setActivity);
   };
 
   useEffect(() => {
@@ -65,10 +80,19 @@ export default function CoachingPage() {
 
   const pending = relationships.filter((r) => r.status === "pending");
   const active = relationships.filter((r) => r.status === "active");
+  const totalFlagged = active.reduce((sum, r) => sum + r.flaggedCount, 0);
 
   return (
     <div>
-      <div className="section-label mb-3 !text-[var(--coach-blue)]">Coaching</div>
+      <Link href="/" className="font-label text-[11px] text-[var(--muted)] hover:text-[var(--chalk)]">← Back to app</Link>
+
+      <div className="section-label mt-3 mb-3 !text-[var(--coach-blue)]">Coaching Dashboard</div>
+
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        <Stat value={active.length} label="Clients" />
+        <Stat value={pending.length} label="Pending" />
+        <Stat value={totalFlagged} label="Flagged" accent={totalFlagged > 0} />
+      </div>
 
       <form onSubmit={invite} className="card !border-[var(--coach-blue-dim)] mb-4">
         <div className="font-label text-xs text-[var(--chalk-dim)] mb-2">Invite a client</div>
@@ -99,7 +123,7 @@ export default function CoachingPage() {
 
       <div className="section-label mb-3 !text-[var(--coach-blue)]">Clients</div>
       {active.length === 0 && (
-        <div className="card text-center text-[var(--muted)] font-label text-xs">No active clients yet.</div>
+        <div className="card text-center text-[var(--muted)] font-label text-xs mb-4">No active clients yet.</div>
       )}
       {active.map((r) => (
         <Link
@@ -110,10 +134,48 @@ export default function CoachingPage() {
           <Avatar name={r.client.name} avatarUrl={r.client.avatarUrl} />
           <div className="min-w-0 flex-1">
             <div className="font-label text-[13px]">{r.client.name}</div>
-            <div className="font-label text-[11px] text-[var(--chalk-dim)]">@{r.client.username}</div>
+            <div className="font-label text-[11px] text-[var(--chalk-dim)]">
+              {r.lastWorkoutDate ? `Last workout ${formatDate(r.lastWorkoutDate)}` : "No workouts logged"} · {r.workoutsThisWeek} this week
+            </div>
           </div>
+          {r.flaggedCount > 0 && (
+            <span className="font-label text-[10px] uppercase tracking-wide text-[var(--red)] shrink-0">{r.flaggedCount} flagged</span>
+          )}
         </Link>
       ))}
+
+      <div className="section-label mb-3 mt-4 !text-[var(--coach-blue)]">Recent Activity</div>
+      {activity === null ? (
+        <p className="font-label text-xs text-[var(--muted)]">Loading…</p>
+      ) : activity.length === 0 ? (
+        <div className="card text-center text-[var(--muted)] font-label text-xs">Nothing logged by your clients yet.</div>
+      ) : (
+        activity.map((e) => (
+          <div key={e.id} className="card !py-3 !px-3.5 mb-2 flex items-start gap-3">
+            <Link href={`/coaching/${e.client.username}`} className="shrink-0">
+              <Avatar name={e.client.name} avatarUrl={e.client.avatarUrl} />
+            </Link>
+            <div className="min-w-0 flex-1">
+              <div className="font-label text-[13px]">
+                <Link href={`/coaching/${e.client.username}`} className="hover:underline">{e.client.name}</Link>
+                {e.type === "workout" && <> logged <span className="text-[var(--chalk-dim)]">{e.workoutName}</span></>}
+                {e.type === "cardio" && <> logged <span className="text-[var(--chalk-dim)]">{e.durationMinutes} min {e.cardioType}</span></>}
+                {e.type === "pr" && <> hit a new PR: <span className="text-[var(--olive)]">{e.exerciseName} — {e.weight}lb × {e.reps}</span></>}
+              </div>
+              <div className="font-label text-[11px] text-[var(--muted)] mt-0.5">{formatDate(e.date)}</div>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+function Stat({ value, label, accent }: { value: number; label: string; accent?: boolean }) {
+  return (
+    <div className="card !py-3 text-center">
+      <div className={`font-display text-2xl ${accent ? "text-[var(--red)]" : ""}`}>{value}</div>
+      <div className="font-label text-[10px] uppercase tracking-wide text-[var(--muted)] mt-0.5">{label}</div>
     </div>
   );
 }

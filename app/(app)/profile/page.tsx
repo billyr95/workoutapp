@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { useAppData } from "@/lib/useAppData";
 import LoadingMark from "@/components/LoadingMark";
 
 export default function ProfilePage() {
   const { data, loading, refetch } = useAppData();
+  const { data: session } = useSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -92,6 +94,12 @@ export default function ProfilePage() {
       {u.username && (
         <Link href={`/u/${u.username}`} className="block card mb-4 text-center hover:border-[var(--chalk-dim)]">
           <span className="font-label text-xs text-[var(--chalk)]">View my public profile →</span>
+        </Link>
+      )}
+
+      {session?.user?.isCoach && (
+        <Link href="/coaching" className="block card mb-4 text-center !border-[var(--coach-blue-dim)] hover:!border-[var(--coach-blue)]">
+          <span className="font-label text-xs text-[var(--coach-blue)]">Coaching Dashboard →</span>
         </Link>
       )}
 
