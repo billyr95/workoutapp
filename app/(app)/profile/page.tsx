@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAppData } from "@/lib/useAppData";
 import LoadingMark from "@/components/LoadingMark";
@@ -95,6 +95,8 @@ export default function ProfilePage() {
         </Link>
       )}
 
+      <CoachSection />
+
       <div className="section-label mb-3">Public Profile Visibility</div>
       <div className="card mb-4">
         <PrivacyToggle label="Current weight" checked={u.showWeight} onChange={() => toggleSetting("showWeight")} />
@@ -143,6 +145,105 @@ export default function ProfilePage() {
         </div>
       )}
     </div>
+  );
+}
+
+type CoachRelationship = {
+  id: number;
+  status: "pending" | "active";
+  coach: { username: string | null; name: string; avatarUrl: string | null };
+  notes: { id: number; content: string; createdAt: string }[];
+  editLog: { id: number; summary: string; createdAt: string; flagged: boolean; flagNote: string | null }[];
+};
+
+function CoachSection() {
+  const [relationships, setRelationships] = useState<CoachRelationship[] | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  const refetch = () => {
+    fetch("/api/coach/my-coaches")
+      .then((res) => res.json())
+      .then(setRelationships);
+  };
+
+  useEffect(() => {
+    refetch();
+  }, []);
+
+  async function respond(id: number, accept: boolean) {
+    setBusyId(id);
+    await fetch(`/api/coach/invites/${id}/respond`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accept }),
+    });
+    setBusyId(null);
+    refetch();
+  }
+
+  async function flag(logId: number) {
+    setBusyId(logId);
+    await fetch(`/api/coach/edit-log/${logId}/flag`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    setBusyId(null);
+    refetch();
+  }
+
+  if (!relationships || relationships.length === 0) return null;
+
+  const pending = relationships.filter((r) => r.status === "pending");
+  const active = relationships.filter((r) => r.status === "active");
+
+  return (
+    <>
+      {pending.map((r) => (
+        <div key={r.id} className="card !border-[var(--coach-blue-dim)] mb-4">
+          <div className="section-label mb-2 !text-[var(--coach-blue)]">Coach Invite</div>
+          <p className="text-[13px] mb-3"><strong>{r.coach.name}</strong> (@{r.coach.username}) wants to coach you.</p>
+          <div className="flex gap-2">
+            <button className="btn !bg-[var(--coach-blue)] !text-white flex-1" onClick={() => respond(r.id, true)} disabled={busyId === r.id}>Accept</button>
+            <button className="btn-ghost rounded flex-1" onClick={() => respond(r.id, false)} disabled={busyId === r.id}>Decline</button>
+          </div>
+        </div>
+      ))}
+
+      {active.map((r) => (
+        <div key={r.id} className="card !border-[var(--coach-blue-dim)] mb-4">
+          <div className="section-label mb-2 !text-[var(--coach-blue)]">Your Coach — {r.coach.name}</div>
+
+          {r.notes.length > 0 && (
+            <div className="mb-3">
+              {r.notes.map((n) => (
+                <div key={n.id} className="border-t border-[var(--line)] pt-2 mt-2 first:border-0 first:pt-0 first:mt-0">
+                  <p className="text-[13px] leading-relaxed">{n.content}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {r.editLog.length > 0 && (
+            <div>
+              <div className="font-label text-[11px] text-[var(--chalk-dim)] mb-1.5">Program changes</div>
+              {r.editLog.map((e) => (
+                <div key={e.id} className="flex items-center justify-between gap-2 mb-1.5">
+                  <span className="font-label text-[12px] text-[var(--chalk-dim)]">{e.summary}</span>
+                  {e.flagged ? (
+                    <span className="font-label text-[10px] uppercase tracking-wide text-[var(--red)] shrink-0">Flagged</span>
+                  ) : (
+                    <button
+                      className="font-label text-[10px] uppercase tracking-wide text-[var(--muted)] hover:text-[var(--red)] shrink-0"
+                      onClick={() => flag(e.id)}
+                      disabled={busyId === e.id}
+                    >
+                      Flag
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </>
   );
 }
 

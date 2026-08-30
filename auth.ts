@@ -41,7 +41,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const valid = await compare(password, user.passwordHash);
         if (!valid) return null;
 
-        return { id: String(user.id), email: user.email, name: user.name, username: user.username };
+        return { id: String(user.id), email: user.email, name: user.name, username: user.username, isCoach: user.isCoach };
       },
     }),
   ],
@@ -90,12 +90,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (dbUser) {
           token.userId = String(dbUser.id);
           token.username = dbUser.username;
+          token.isCoach = dbUser.isCoach;
         }
         return token;
       }
       if (user) {
         token.userId = user.id;
         token.username = (user as { username: string | null }).username;
+        token.isCoach = (user as { isCoach: boolean }).isCoach;
       }
       return token;
     },
@@ -103,6 +105,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.id = token.userId as string;
         session.user.username = (token.username as string | null) ?? null;
+        session.user.isCoach = (token.isCoach as boolean) ?? false;
       }
       return session;
     },

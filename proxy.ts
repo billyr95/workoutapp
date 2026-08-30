@@ -3,9 +3,9 @@ import { auth } from "@/auth";
 
 // Sign-in/sign-up bounce an already-authenticated user back to "/" — terms/privacy stay
 // visible either way, since they're referenced from the sign-up form and useful post-login too.
-const AUTH_FORM_PATHS = ["/auth/sign-in", "/auth/sign-up"];
+const AUTH_FORM_PATHS = ["/auth/sign-in", "/auth/sign-up", "/auth/coach-sign-up"];
 const PUBLIC_PATHS = [...AUTH_FORM_PATHS, "/terms", "/privacy"];
-const PUBLIC_API_PREFIXES = ["/api/auth", "/api/register"];
+const PUBLIC_API_PREFIXES = ["/api/auth", "/api/register", "/api/coach/register"];
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;

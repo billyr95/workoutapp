@@ -12,6 +12,9 @@
   --red-dim: #7a2c1e;
   --olive: #6a7f57;
   --muted: #74777c;
+  /* coaching-side accent — kept distinct from --red so coach screens read as a different mode */
+  --coach-blue: #2d55ea;
+  --coach-blue-dim: #1c2f66;
 
   /* categorical series palette — dark-surface validated, fixed order, never cycled per-selection */
   --series-1: #3987e5; /* blue */

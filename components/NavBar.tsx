@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import type { SVGProps } from "react";
 
 function IconProps(props: SVGProps<SVGSVGElement>) {
@@ -70,36 +71,50 @@ function ProfileIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+function CoachingIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...IconProps(props)}>
+      <rect x="5" y="4" width="14" height="18" rx="2" />
+      <path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1Z" fill="currentColor" stroke="none" />
+      <polyline points="9 13 11 15 15 11" />
+    </svg>
+  );
+}
+
 const TABS = [
-  { href: "/", label: "Today", Icon: TodayIcon },
-  { href: "/schedule", label: "Schedule", Icon: ScheduleIcon },
-  { href: "/progress", label: "Progress", Icon: ProgressIcon },
-  { href: "/feed", label: "Feed", Icon: FeedIcon },
-  { href: "/search", label: "Search", Icon: SearchIcon },
-  { href: "/profile", label: "Profile", Icon: ProfileIcon },
+  { href: "/", label: "Today", Icon: TodayIcon, activeColor: "var(--red)" },
+  { href: "/schedule", label: "Schedule", Icon: ScheduleIcon, activeColor: "var(--red)" },
+  { href: "/progress", label: "Progress", Icon: ProgressIcon, activeColor: "var(--red)" },
+  { href: "/feed", label: "Feed", Icon: FeedIcon, activeColor: "var(--red)" },
+  { href: "/search", label: "Search", Icon: SearchIcon, activeColor: "var(--red)" },
+  { href: "/profile", label: "Profile", Icon: ProfileIcon, activeColor: "var(--red)" },
 ];
+
+const COACHING_TAB = { href: "/coaching", label: "Coaching", Icon: CoachingIcon, activeColor: "var(--coach-blue)" };
 
 export default function NavBar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const tabs = session?.user?.isCoach ? [...TABS.slice(0, 3), COACHING_TAB, ...TABS.slice(3)] : TABS;
+
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--line)] bg-[var(--bg)]"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="max-w-xl mx-auto flex overflow-x-auto">
-        {TABS.map(({ href, label, Icon }) => {
-          const active = pathname === href;
+        {tabs.map(({ href, label, Icon, activeColor }) => {
+          const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
             <Link
               key={href}
               href={href}
+              style={active ? { color: "var(--chalk)", borderTopColor: activeColor } : undefined}
               className={`flex-1 flex flex-col items-center gap-1 text-center font-label text-[11px] tracking-[0.1em] uppercase py-2.5 px-2 border-t-2 whitespace-nowrap transition-colors ${
-                active
-                  ? "text-[var(--chalk)] border-[var(--red)]"
-                  : "text-[var(--muted)] border-transparent hover:text-[var(--chalk)]"
+                active ? "" : "text-[var(--muted)] border-transparent hover:text-[var(--chalk)]"
               }`}
             >
-              <Icon className="h-[18px] w-[18px]" strokeWidth={active ? 2 : 1.8} />
+              <Icon className="h-[18px] w-[18px]" strokeWidth={active ? 2 : 1.8} style={active ? { color: activeColor } : undefined} />
               {label}
             </Link>
           );

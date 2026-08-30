@@ -24,6 +24,8 @@ export const users = pgTable("users", {
   showWorkoutDays: boolean("show_workout_days").notNull().default(false),
   // the saved program (if any) currently loaded onto the live schedule
   activeProgramId: integer("active_program_id"),
+  // gates access to /coaching — set only at registration, via a valid coach invite code
+  isCoach: boolean("is_coach").notNull().default(false),
 });
 
 export const follows = pgTable("follows", {
@@ -168,4 +170,44 @@ export const dailyInsights = pgTable("daily_insights", {
   date: text("date").notNull(),
   content: text("content").notNull(),
   createdAt: text("created_at").notNull(),
+});
+
+// Single-use codes that grant isCoach on registration — minted out-of-band (no self-serve UI yet).
+export const coachInviteCodes = pgTable("coach_invite_codes", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  usedByUserId: integer("used_by_user_id"),
+  createdAt: text("created_at").notNull(),
+  usedAt: text("used_at"),
+});
+
+// A coach's oversight relationship with one client. Coach-initiated; the client must accept
+// before the coach gets any access — see hasActiveCoachAccess in lib/data.ts.
+export const coachRelationships = pgTable("coach_relationships", {
+  id: serial("id").primaryKey(),
+  coachId: integer("coach_id").notNull(),
+  clientId: integer("client_id").notNull(),
+  status: text("status").notNull(), // "pending" | "active" | "declined"
+  invitedAt: text("invited_at").notNull(),
+  respondedAt: text("responded_at"),
+});
+
+export const coachNotes = pgTable("coach_notes", {
+  id: serial("id").primaryKey(),
+  coachId: integer("coach_id").notNull(),
+  clientId: integer("client_id").notNull(),
+  content: text("content").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+// Human-readable trail of coach-made edits to a client's program, so the client can review
+// and flag anything they didn't want — edits apply immediately, this is the visibility layer.
+export const programEditLog = pgTable("program_edit_log", {
+  id: serial("id").primaryKey(),
+  coachId: integer("coach_id").notNull(),
+  clientId: integer("client_id").notNull(),
+  summary: text("summary").notNull(),
+  createdAt: text("created_at").notNull(),
+  flagged: boolean("flagged").notNull().default(false),
+  flagNote: text("flag_note"),
 });

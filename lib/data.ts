@@ -360,3 +360,129 @@ export function validateProgramData(raw: unknown): { data: ProgramData; errors: 
 
   return { data: { schedule, workouts }, errors };
 }
+
+// ---- Coaching ----
+// A coach only gets access to a client's data/mutations once a coachRelationships row
+// between them is "active" (the client accepted the coach's invite).
+export async function hasActiveCoachAccess(coachId: number, clientId: number): Promise<boolean> {
+  const rows = await db.select().from(schema.coachRelationships);
+  return rows.some((r) => r.coachId === coachId && r.clientId === clientId && r.status === "active");
+}
+
+export async function logProgramEdit(coachId: number, clientId: number, summary: string) {
+  await db.insert(schema.programEditLog).values({ coachId, clientId, summary, createdAt: new Date().toISOString() });
+}
+
+type MutationResult<T> = { ok: true; data: T; summary: string } | { ok: false; error: string; status: number };
+
+// Shared by the self-service /api/schedule route (targetUserId = session user) and the
+// coach-scoped /api/coach/clients/[clientId]/schedule route (targetUserId = the client) —
+// same upsert semantics either way, only the caller's authorization differs.
+export async function upsertScheduleDay(
+  targetUserId: number,
+  day: string,
+  type: "Rest" | "Cardio" | "Workout",
+  name?: string,
+  category?: string
+): Promise<MutationResult<null>> {
+  if (!VALID_DAYS.includes(day)) return { ok: false, error: "Invalid day", status: 400 };
+
+  let workoutType: string;
+  let categoryValue: string | null;
+
+  if (type === "Rest") {
+    workoutType = "Rest";
+    categoryValue = null;
+  } else if (type === "Cardio") {
+    workoutType = "Cardio";
+    categoryValue = null;
+  } else if (type === "Workout") {
+    const trimmedName = (name ?? "").trim();
+    if (!trimmedName) return { ok: false, error: "Workout name is required", status: 400 };
+    if (category !== "Strength" && category !== "Hypertrophy") {
+      return { ok: false, error: "Category must be Strength or Hypertrophy", status: 400 };
+    }
+    workoutType = trimmedName;
+    categoryValue = category;
+
+    const allWorkouts = await db.select().from(schema.workouts);
+    const existingWorkout = allWorkouts.find((w) => w.userId === targetUserId && w.name === trimmedName);
+    if (!existingWorkout) {
+      await db.insert(schema.workouts).values({ userId: targetUserId, name: trimmedName });
+      // Brand new workout for this user — no exercises yet, but the name itself is worth recording.
+      await recordCommunityWorkout(trimmedName, [], targetUserId);
+    }
+  } else {
+    return { ok: false, error: "Invalid type", status: 400 };
+  }
+
+  const allSchedule = await db.select().from(schema.schedule);
+  const existingDay = allSchedule.find((s) => s.userId === targetUserId && s.day === day);
+  if (existingDay) {
+    await db.update(schema.schedule).set({ workoutType, category: categoryValue }).where(eq(schema.schedule.id, existingDay.id));
+  } else {
+    await db.insert(schema.schedule).values({ userId: targetUserId, day, workoutType, category: categoryValue });
+  }
+
+  return { ok: true, data: null, summary: `Set ${day} to ${workoutType}${categoryValue ? ` (${categoryValue})` : ""}` };
+}
+
+export async function addExerciseToWorkout(
+  targetUserId: number,
+  workoutId: number,
+  input: { name: string; sets: number; repMin: number; repMax: number; restSeconds: number | null }
+): Promise<MutationResult<typeof schema.exercises.$inferSelect>> {
+  const { name, sets, repMin, repMax, restSeconds } = input;
+  if (!workoutId || !name || !sets || !repMin || !repMax) {
+    return { ok: false, error: "Missing required fields", status: 400 };
+  }
+
+  const allWorkouts = await db.select().from(schema.workouts);
+  const workout = allWorkouts.find((w) => w.id === workoutId);
+  if (!workout || workout.userId !== targetUserId) {
+    return { ok: false, error: "Not found", status: 404 };
+  }
+
+  const allExercises = await db.select().from(schema.exercises);
+  const existingCount = allExercises.filter((e) => e.workoutId === workoutId).length;
+
+  const [row] = await db
+    .insert(schema.exercises)
+    .values({ workoutId, name, sets, repMin, repMax, restSeconds: restSeconds ?? null, sortOrder: existingCount })
+    .returning();
+
+  await recordCommunityExercise(name, sets, repMin, repMax, restSeconds ?? null, targetUserId);
+  const siblingExercises = [...allExercises.filter((e) => e.workoutId === workoutId), row].sort((a, b) => a.sortOrder - b.sortOrder);
+  await recordCommunityWorkout(
+    workout.name,
+    siblingExercises.map((e) => ({ name: e.name, sets: e.sets, repMin: e.repMin, repMax: e.repMax, restSeconds: e.restSeconds })),
+    targetUserId
+  );
+
+  return { ok: true, data: row, summary: `Added ${name} to ${workout.name}` };
+}
+
+export async function removeExerciseById(targetUserId: number, id: number): Promise<MutationResult<null>> {
+  if (!id) return { ok: false, error: "Missing id", status: 400 };
+
+  const allExercises = await db.select().from(schema.exercises);
+  const exercise = allExercises.find((e) => e.id === id);
+  if (!exercise) return { ok: false, error: "Not found", status: 404 };
+
+  const allWorkouts = await db.select().from(schema.workouts);
+  const workout = allWorkouts.find((w) => w.id === exercise.workoutId);
+  if (!workout || workout.userId !== targetUserId) {
+    return { ok: false, error: "Not found", status: 404 };
+  }
+
+  await db.delete(schema.exercises).where(eq(schema.exercises.id, id));
+
+  const remaining = allExercises.filter((e) => e.workoutId === exercise.workoutId && e.id !== id).sort((a, b) => a.sortOrder - b.sortOrder);
+  await recordCommunityWorkout(
+    workout.name,
+    remaining.map((e) => ({ name: e.name, sets: e.sets, repMin: e.repMin, repMax: e.repMax, restSeconds: e.restSeconds })),
+    targetUserId
+  );
+
+  return { ok: true, data: null, summary: `Removed ${exercise.name} from ${workout.name}` };
+}
