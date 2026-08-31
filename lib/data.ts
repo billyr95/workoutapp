@@ -373,6 +373,18 @@ export async function logProgramEdit(coachId: number, clientId: number, summary:
   await db.insert(schema.programEditLog).values({ coachId, clientId, summary, createdAt: new Date().toISOString() });
 }
 
+// Active clients only, for the desktop sidebar's persistent client nav — server-side so it
+// renders with the shell on first paint instead of popping in after a client fetch.
+export async function getActiveCoachClients(coachId: number) {
+  const [relationships, allUsers] = await Promise.all([db.select().from(schema.coachRelationships), db.select().from(schema.users)]);
+  const userById = new Map(allUsers.map((u) => [u.id, u]));
+  return relationships
+    .filter((r) => r.coachId === coachId && r.status === "active")
+    .map((r) => userById.get(r.clientId))
+    .filter((u): u is NonNullable<typeof u> => !!u)
+    .map((u) => ({ username: u.username, name: u.name, avatarUrl: u.avatarUrl }));
+}
+
 type MutationResult<T> = { ok: true; data: T; summary: string } | { ok: false; error: string; status: number; errors?: string[] };
 
 // Shared by the self-service /api/schedule route (targetUserId = session user) and the

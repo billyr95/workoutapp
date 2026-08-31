@@ -12,13 +12,29 @@ export const metadata: Metadata = {
   },
 };
 
+// Runs before hydration so an explicit theme choice applies before first paint —
+// otherwise a saved "light" preference would flash dark for a frame on every load.
+const themeInitScript = `
+(function () {
+  try {
+    var theme = localStorage.getItem("theme");
+    if (theme === "light" || theme === "dark") {
+      document.documentElement.setAttribute("data-theme", theme);
+    }
+  } catch (e) {}
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="en" className="h-full" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className="min-h-full bg-[var(--bg)] text-[var(--chalk)]">
         <Providers>{children}</Providers>
       </body>

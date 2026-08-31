@@ -2,6 +2,7 @@
 @import "tailwindcss";
 
 :root {
+  /* dark is the default palette — unguarded, so it's the baseline for system/no-preference too */
   --bg: #17181a;
   --surface: #1f2124;
   --surface2: #26282b;
@@ -25,6 +26,44 @@
   --series-6: #e66767; /* red */
   --series-7: #d55181; /* magenta */
   --series-8: #d95926; /* orange */
+
+  color-scheme: dark;
+}
+
+/* Light mode via system preference — only when the user hasn't explicitly forced dark. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #faf8f4;
+    --surface: #ffffff;
+    --surface2: #f1efe8;
+    --line: #ddd8cc;
+    --chalk: #201f1c;
+    --chalk-dim: #6b665c;
+    --red: #dd4a30;
+    --red-dim: #f0b8a4;
+    --olive: #55673f;
+    --muted: #8a8577;
+    --coach-blue: #2748d6;
+    --coach-blue-dim: #c3cdf5;
+    color-scheme: light;
+  }
+}
+
+/* Light mode via explicit toggle — wins over system preference in either direction. */
+:root[data-theme="light"] {
+  --bg: #faf8f4;
+  --surface: #ffffff;
+  --surface2: #f1efe8;
+  --line: #ddd8cc;
+  --chalk: #201f1c;
+  --chalk-dim: #6b665c;
+  --red: #dd4a30;
+  --red-dim: #f0b8a4;
+  --olive: #55673f;
+  --muted: #8a8577;
+  --coach-blue: #2748d6;
+  --coach-blue-dim: #c3cdf5;
+  color-scheme: light;
 }
 
 html, body {
@@ -114,3 +153,15 @@ input::placeholder { color: var(--muted); }
 .loading-mark-fill {
   animation: loading-mark-fill 1.3s cubic-bezier(0.65, 0, 0.35, 1) infinite alternate;
 }
+
+/* The brand wordmark is baked into two static SVGs (white text / dark text) since the file
+   itself hardcodes its fill — swap which one is visible using the same theme conditions as
+   the color tokens above, so it never renders illegibly against the wrong background. */
+.brand-logo-dark { display: block; }
+.brand-logo-light { display: none; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .brand-logo-dark { display: none; }
+  :root:not([data-theme="dark"]) .brand-logo-light { display: block; }
+}
+:root[data-theme="light"] .brand-logo-dark { display: none; }
+:root[data-theme="light"] .brand-logo-light { display: block; }

@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import GoogleButton from "@/components/GoogleButton";
+import BrandLogo from "@/components/BrandLogo";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -47,8 +48,7 @@ export default function SignUpPage() {
     <div className="max-w-xl mx-auto min-h-screen flex flex-col items-center justify-center px-5">
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/repra-full-logo.svg" alt="Repra" className="h-8 w-auto mx-auto" />
+          <BrandLogo className="h-8 w-auto mx-auto" />
           <h1 className="font-display text-4xl leading-none mt-3">Create Account</h1>
         </div>
         <form onSubmit={handleSubmit} className="card">

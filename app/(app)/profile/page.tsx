@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useAppData } from "@/lib/useAppData";
 import LoadingMark from "@/components/LoadingMark";
+import ThemeToggle from "@/components/ThemeToggle";
 import { formatDate } from "@/components/ProgressCharts";
 
 export default function ProfilePage() {
@@ -13,6 +14,8 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [goalForm, setGoalForm] = useState<{ goalText?: string; heightFeet?: string; heightInches?: string; startingWeight?: string; goalWeight?: string }>({});
+  const [savingGoal, setSavingGoal] = useState(false);
 
   const flash = (msg: string) => {
     setToast(msg);
@@ -51,6 +54,24 @@ export default function ProfilePage() {
       body: JSON.stringify({ [key]: !u[key] }),
     });
     await refetch();
+  }
+
+  async function saveGoal() {
+    setSavingGoal(true);
+    await fetch("/api/profile/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        goalText: goalForm.goalText ?? u.goalText,
+        heightFeet: Number(goalForm.heightFeet ?? u.heightFeet),
+        heightInches: Number(goalForm.heightInches ?? u.heightInches),
+        startingWeight: Number(goalForm.startingWeight ?? u.startingWeight),
+        goalWeight: Number(goalForm.goalWeight ?? u.goalWeight),
+      }),
+    });
+    setSavingGoal(false);
+    await refetch();
+    flash("Goal updated");
   }
 
   return (
@@ -106,6 +127,11 @@ export default function ProfilePage() {
 
       <CoachSection />
 
+      <div className="section-label mb-3">Appearance</div>
+      <div className="card mb-4">
+        <ThemeToggle />
+      </div>
+
       <div className="section-label mb-3">Public Profile Visibility</div>
       <div className="card mb-4">
         <PrivacyToggle label="Current weight" checked={u.showWeight} onChange={() => toggleSetting("showWeight")} />
@@ -120,10 +146,46 @@ export default function ProfilePage() {
 
       <div className="section-label mb-3">Goal</div>
       <div className="card mb-4">
-        <div className="font-display text-xl">{u.goalText}</div>
-        <div className="font-label text-xs text-[var(--chalk-dim)] mt-1">
-          {u.heightFeet}&apos;{u.heightInches}&quot; · Start {u.startingWeight}lb → Goal {u.goalWeight}lb
+        <div className="mb-2">
+          <input
+            placeholder="Goal (e.g. Build muscle, lose fat)"
+            defaultValue={u.goalText}
+            onChange={(e) => setGoalForm({ ...goalForm, goalText: e.target.value })}
+          />
         </div>
+        <div className="flex gap-2 mb-2">
+          <input
+            type="number"
+            placeholder="Height (ft)"
+            defaultValue={u.heightFeet}
+            onChange={(e) => setGoalForm({ ...goalForm, heightFeet: e.target.value })}
+          />
+          <input
+            type="number"
+            placeholder="Height (in)"
+            defaultValue={u.heightInches}
+            onChange={(e) => setGoalForm({ ...goalForm, heightInches: e.target.value })}
+          />
+        </div>
+        <div className="flex gap-2 mb-3">
+          <input
+            type="number"
+            step="0.1"
+            placeholder="Starting weight (lb)"
+            defaultValue={u.startingWeight}
+            onChange={(e) => setGoalForm({ ...goalForm, startingWeight: e.target.value })}
+          />
+          <input
+            type="number"
+            step="0.1"
+            placeholder="Goal weight (lb)"
+            defaultValue={u.goalWeight}
+            onChange={(e) => setGoalForm({ ...goalForm, goalWeight: e.target.value })}
+          />
+        </div>
+        <button className="btn-ghost w-full rounded" onClick={saveGoal} disabled={savingGoal}>
+          {savingGoal ? "Saving…" : "Save Goal"}
+        </button>
       </div>
 
       <div className="section-label mb-3">Daily Macros</div>

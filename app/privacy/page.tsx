@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BrandLogo from "@/components/BrandLogo";
 
 export const metadata = { title: "Privacy Policy — Repra" };
 
@@ -9,8 +10,7 @@ export default function PrivacyPage() {
   return (
     <div className="max-w-xl mx-auto min-h-screen flex flex-col px-5 py-8">
       <div className="mb-6">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/repra-full-logo.svg" alt="Repra" className="h-6 w-auto" />
+        <BrandLogo className="h-6 w-auto" />
       </div>
 
       <h1 className="font-display text-3xl leading-none mb-1">Privacy Policy</h1>

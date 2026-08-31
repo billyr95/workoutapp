@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import BrandLogo from "@/components/BrandLogo";
 
 export default function CoachSignUpPage() {
   return (
@@ -56,8 +57,7 @@ function CoachSignUpForm() {
     <div className="max-w-xl mx-auto min-h-screen flex flex-col items-center justify-center px-5">
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/repra-full-logo.svg" alt="Repra" className="h-8 w-auto mx-auto" />
+          <BrandLogo className="h-8 w-auto mx-auto" />
           <h1 className="font-display text-4xl leading-none mt-3 !text-[var(--coach-blue)]">Coach Sign Up</h1>
           <p className="font-label text-xs text-[var(--muted)] mt-2">Invite-only, for now — you&apos;ll need a code from Repra.</p>
         </div>

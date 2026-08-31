@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 
 export type LiftPoint = { date: string; weight: number };
 type Exercise = { id: number; name: string };
@@ -62,6 +62,28 @@ function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
 }
 
+// Catmull-Rom → cubic Bezier: turns straight-segment points into one flowing curve through
+// every point (tension 1/6, the standard conversion), instead of the angular polyline before.
+export function smoothPath(points: readonly (readonly [number, number])[]): string {
+  if (points.length === 0) return "";
+  if (points.length < 3) {
+    return points.map((p, i) => `${i === 0 ? "M" : "L"} ${p[0]} ${p[1]}`).join(" ");
+  }
+  let d = `M ${points[0][0]} ${points[0][1]}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i === 0 ? 0 : i - 1];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2[0]} ${p2[1]}`;
+  }
+  return d;
+}
+
 // Evenly spaced label indices across an array (always includes first + last), capped at `max` labels.
 function tickIndices(length: number, max = 5) {
   const count = Math.min(max, length);
@@ -102,10 +124,9 @@ export function WeightChart({ weights, hasHistory }: { weights: { date: string; 
   const yForWeight = (weight: number) => plotBottom - ((weight - min) / (max - min || 1)) * (h - pad * 2);
   const points = weights.map((d, i) => {
     const x = pad + (i / (weights.length - 1)) * (w - pad * 2);
-    return [x, yForWeight(d.weight)];
+    return [x, yForWeight(d.weight)] as const;
   });
-  let path = `M ${points[0][0]} ${points[0][1]}`;
-  for (let i = 1; i < points.length; i++) path += ` L ${points[i][0]} ${points[i][1]}`;
+  const path = smoothPath(points);
   const areaPath = `${path} L ${points[points.length - 1][0]} ${plotBottom} L ${points[0][0]} ${plotBottom} Z`;
 
   function show(x: number, y: number, weight: number, date: string) {
@@ -142,24 +163,24 @@ export function WeightChart({ weights, hasHistory }: { weights: { date: string; 
             <feDisplacementMap in="SourceGraphic" in2="noise" scale={3} />
           </filter>
           <linearGradient id="weightAreaFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#f05c44" stopOpacity={0.22} />
-            <stop offset="100%" stopColor="#f05c44" stopOpacity={0} />
+            <stop offset="0%" stopColor="var(--red)" stopOpacity={0.22} />
+            <stop offset="100%" stopColor="var(--red)" stopOpacity={0} />
           </linearGradient>
         </defs>
         {[min, mid, max].map((v, i) => {
           const y = yForWeight(v);
           return (
             <g key={i}>
-              <line x1={pad} y1={y} x2={w - pad} y2={y} stroke="#37393d" strokeWidth={1} />
-              <text x={pad} y={y - 4} fill="#74777c" fontFamily="Manrope" fontSize={10}>{Math.round(v)}lb</text>
+              <line x1={pad} y1={y} x2={w - pad} y2={y} stroke="var(--line)" strokeWidth={1} />
+              <text x={pad} y={y - 4} fill="var(--muted)" fontFamily="Manrope" fontSize={10}>{Math.round(v)}lb</text>
             </g>
           );
         })}
         <path d={areaPath} fill="url(#weightAreaFill)" stroke="none" />
-        <path d={path} fill="none" stroke="#e9e4d8" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" filter="url(#chalkFilter)" opacity={0.9} />
+        <path d={path} fill="none" stroke="var(--chalk)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" filter="url(#chalkFilter)" opacity={0.9} />
         {points.map(([x, y], i) => (
           <g key={i}>
-            <circle cx={x} cy={y} r={4} fill="#f05c44" stroke="var(--surface)" strokeWidth={2} />
+            <circle cx={x} cy={y} r={4} fill="var(--red)" stroke="var(--surface)" strokeWidth={2} />
             <circle
               cx={x}
               cy={y}
@@ -183,7 +204,7 @@ export function WeightChart({ weights, hasHistory }: { weights: { date: string; 
         {tickIndices(weights.length).map((i) => {
           const anchor = i === 0 ? "start" : i === weights.length - 1 ? "end" : "middle";
           return (
-            <text key={i} x={points[i][0]} y={h - pad + 14} fill="#74777c" fontFamily="Manrope" fontSize={9} textAnchor={anchor}>
+            <text key={i} x={points[i][0]} y={h - pad + 14} fill="var(--muted)" fontFamily="Manrope" fontSize={9} textAnchor={anchor}>
               {formatDate(weights[i].date)}
             </text>
           );
@@ -197,6 +218,7 @@ export function WeightChart({ weights, hasHistory }: { weights: { date: string; 
 export function LiftProgressChart({ series, selected }: { series: Map<string, LiftPoint[]>; selected: string[] }) {
   const [hover, setHover] = useState<Hover | null>(null);
   const [pinned, setPinned] = useState(false);
+  const gradientPrefix = useId();
 
   const active = selected
     .map((name) => ({ name, points: series.get(name) ?? [] }))
@@ -214,15 +236,20 @@ export function LiftProgressChart({ series, selected }: { series: Map<string, Li
   const allPoints = active.flatMap((s) => s.points);
   const dates = allPoints.map((p) => new Date(p.date).getTime());
   const minDate = Math.min(...dates), maxDate = Math.max(...dates);
-  const dateRange = maxDate - minDate || 1;
+  const dateRange = maxDate - minDate;
   const weights = allPoints.map((p) => p.weight);
   const minW = Math.min(...weights) - 5, maxW = Math.max(...weights) + 5;
   const midW = (minW + maxW) / 2;
   const wRange = maxW - minW || 1;
+  const plotCenterX = pad + (w - pad - padRight) / 2;
 
-  const xFor = (date: string) => pad + ((new Date(date).getTime() - minDate) / dateRange) * (w - pad - padRight);
+  // A single point (or every point sharing one date) has no real date range to place along —
+  // center it in the plot instead of collapsing to the left edge, where it used to sit right
+  // on top of the y-axis grid labels.
+  const xFor = (date: string) =>
+    dateRange === 0 ? plotCenterX : pad + ((new Date(date).getTime() - minDate) / dateRange) * (w - pad - padRight);
   const yFor = (weight: number) => h - pad - ((weight - minW) / wRange) * (h - pad * 2);
-  const xForTime = (t: number) => pad + ((t - minDate) / dateRange) * (w - pad - padRight);
+  const xForTime = (t: number) => (dateRange === 0 ? plotCenterX : pad + ((t - minDate) / dateRange) * (w - pad - padRight));
 
   function show(x: number, y: number, weight: number, name: string, date: string) {
     setHover({ x, y, title: `${weight}lb`, subtitle: `${name} · ${formatDate(date, true)}` });
@@ -243,7 +270,8 @@ export function LiftProgressChart({ series, selected }: { series: Map<string, Li
     });
   }
 
-  const tickCount = Math.min(5, allPoints.length);
+  // A zero date range means every point shares one date — one tick, not five identical ones.
+  const tickCount = dateRange === 0 ? 1 : Math.min(5, allPoints.length);
   const axisTicks = Array.from({ length: tickCount }, (_, i) => minDate + (dateRange * i) / Math.max(1, tickCount - 1));
 
   // Sparing end-of-line labels: place the last value for each series, skipping any
@@ -267,16 +295,28 @@ export function LiftProgressChart({ series, selected }: { series: Map<string, Li
           if (pinned) { setPinned(false); setHover(null); }
         }}
       >
+        <defs>
+          {active.map((s, i) => {
+            const color = colorForLift(s.name);
+            return (
+              <linearGradient key={s.name} id={`${gradientPrefix}-${i}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={color} stopOpacity={0.18} />
+                <stop offset="100%" stopColor={color} stopOpacity={0} />
+              </linearGradient>
+            );
+          })}
+        </defs>
         {[minW, midW, maxW].map((v, i) => (
           <line key={i} x1={pad} y1={yFor(v)} x2={w - pad} y2={yFor(v)} stroke="var(--line)" strokeWidth={1} />
         ))}
-        {active.map((s) => {
+        {active.map((s, seriesIndex) => {
           const color = colorForLift(s.name);
           const pts = s.points.map((p) => [xFor(p.date), yFor(p.weight)] as const);
-          let path = pts.length > 1 ? `M ${pts[0][0]} ${pts[0][1]}` : "";
-          for (let i = 1; i < pts.length; i++) path += ` L ${pts[i][0]} ${pts[i][1]}`;
+          const path = smoothPath(pts);
+          const areaPath = pts.length > 1 ? `${path} L ${pts[pts.length - 1][0]} ${h - pad} L ${pts[0][0]} ${h - pad} Z` : "";
           return (
             <g key={s.name}>
+              {pts.length > 1 && <path d={areaPath} fill={`url(#${gradientPrefix}-${seriesIndex})`} stroke="none" />}
               {pts.length > 1 && <path d={path} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />}
               {pts.map(([x, y], i) => (
                 <g key={i}>
