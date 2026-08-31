@@ -9,13 +9,15 @@ export async function GET() {
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const clientId = Number(session.user.id);
 
-  const [relationships, allUsers, allNotes, allEditLog] = await Promise.all([
+  const [relationships, allUsers, allNotes, allEditLog, allWorkoutLogs] = await Promise.all([
     db.select().from(schema.coachRelationships),
     db.select().from(schema.users),
     db.select().from(schema.coachNotes),
     db.select().from(schema.programEditLog),
+    db.select().from(schema.workoutLogs),
   ]);
   const userById = new Map(allUsers.map((u) => [u.id, u]));
+  const workoutLogDateById = new Map(allWorkoutLogs.map((l) => [l.id, l.date]));
 
   const mine = relationships
     .filter((r) => r.clientId === clientId && r.status !== "declined")
@@ -31,6 +33,12 @@ export async function GET() {
             ? allNotes
                 .filter((n) => n.coachId === r.coachId && n.clientId === clientId)
                 .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+                .map((n) => ({
+                  id: n.id,
+                  content: n.content,
+                  createdAt: n.createdAt,
+                  workoutDate: n.workoutLogId != null ? (workoutLogDateById.get(n.workoutLogId) ?? null) : null,
+                }))
             : [],
         editLog:
           r.status === "active"

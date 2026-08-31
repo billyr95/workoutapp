@@ -373,7 +373,7 @@ export async function logProgramEdit(coachId: number, clientId: number, summary:
   await db.insert(schema.programEditLog).values({ coachId, clientId, summary, createdAt: new Date().toISOString() });
 }
 
-type MutationResult<T> = { ok: true; data: T; summary: string } | { ok: false; error: string; status: number };
+type MutationResult<T> = { ok: true; data: T; summary: string } | { ok: false; error: string; status: number; errors?: string[] };
 
 // Shared by the self-service /api/schedule route (targetUserId = session user) and the
 // coach-scoped /api/coach/clients/[clientId]/schedule route (targetUserId = the client) —
@@ -485,4 +485,132 @@ export async function removeExerciseById(targetUserId: number, id: number): Prom
   );
 
   return { ok: true, data: null, summary: `Removed ${exercise.name} from ${workout.name}` };
+}
+
+// Shared by the self-service /api/programs routes (targetUserId = session user) and the
+// coach-scoped /api/coach/clients/[clientId]/programs routes (targetUserId = the client).
+export async function listPrograms(targetUserId: number) {
+  const allPrograms = await db.select().from(schema.programs);
+  return allPrograms
+    .filter((p) => p.userId === targetUserId)
+    .map((p) => ({ id: p.id, name: p.name, createdAt: p.createdAt }))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+// body.data omitted = snapshot the target's current live schedule/workouts (and make it their
+// active program); body.data provided (from the builder or an XML upload) = save unapplied.
+export async function saveProgram(
+  targetUserId: number,
+  name: string,
+  providedData?: unknown
+): Promise<MutationResult<{ id: number; name: string; createdAt: string; errors: string[] }>> {
+  const trimmedName = name.trim();
+  if (!trimmedName) return { ok: false, error: "Program name is required", status: 400 };
+
+  const usingProvidedData = providedData !== undefined;
+  let errors: string[] = [];
+  let data: ProgramData;
+  if (usingProvidedData) {
+    const validated = validateProgramData(providedData);
+    data = validated.data;
+    errors = validated.errors;
+    if (data.schedule.length === 0 && data.workouts.length === 0) {
+      return { ok: false, error: "Program has no valid schedule days or workouts", status: 400, errors };
+    }
+  } else {
+    data = await getProgramSnapshot(targetUserId);
+  }
+
+  const [row] = await db
+    .insert(schema.programs)
+    .values({ userId: targetUserId, name: trimmedName, data, createdAt: new Date().toISOString() })
+    .returning();
+  await recordCommunityProgram(data, targetUserId);
+
+  if (!usingProvidedData) {
+    // Saving the current setup means that's the program they're now "on."
+    await db.update(schema.users).set({ activeProgramId: row.id }).where(eq(schema.users.id, targetUserId));
+  }
+
+  return {
+    ok: true,
+    data: { id: row.id, name: row.name, createdAt: row.createdAt, errors },
+    summary: `Saved program "${trimmedName}"`,
+  };
+}
+
+export async function deleteProgram(targetUserId: number, id: number): Promise<MutationResult<null>> {
+  if (!id) return { ok: false, error: "Missing id", status: 400 };
+
+  const allPrograms = await db.select().from(schema.programs);
+  const program = allPrograms.find((p) => p.id === id);
+  if (!program || program.userId !== targetUserId) return { ok: false, error: "Not found", status: 404 };
+
+  await db.delete(schema.programs).where(eq(schema.programs.id, id));
+
+  const [user] = await db.select().from(schema.users).where(eq(schema.users.id, targetUserId));
+  if (user?.activeProgramId === id) {
+    await db.update(schema.users).set({ activeProgramId: null }).where(eq(schema.users.id, targetUserId));
+  }
+
+  return { ok: true, data: null, summary: `Deleted program "${program.name}"` };
+}
+
+// Applies a saved program on top of the target's live schedule/workouts. Existing
+// workouts/exercises are matched by name and updated in place (never deleted) so
+// historical logs and progress-graph data never get orphaned by loading a program.
+export async function loadProgram(targetUserId: number, programId: number): Promise<MutationResult<null>> {
+  if (!programId) return { ok: false, error: "Missing programId", status: 400 };
+
+  const allPrograms = await db.select().from(schema.programs);
+  const program = allPrograms.find((p) => p.id === programId);
+  if (!program || program.userId !== targetUserId) return { ok: false, error: "Not found", status: 404 };
+
+  const { schedule, workouts } = program.data;
+
+  for (const w of workouts) {
+    const allWorkouts = await db.select().from(schema.workouts);
+    let workout = allWorkouts.find((existing) => existing.userId === targetUserId && existing.name === w.name);
+    if (!workout) {
+      [workout] = await db.insert(schema.workouts).values({ userId: targetUserId, name: w.name }).returning();
+    }
+
+    const allExercises = await db.select().from(schema.exercises);
+    const existingExercises = allExercises.filter((e) => e.workoutId === workout!.id);
+
+    for (let i = 0; i < w.exercises.length; i++) {
+      const ex = w.exercises[i];
+      const existing = existingExercises.find((e) => e.name === ex.name);
+      if (existing) {
+        await db
+          .update(schema.exercises)
+          .set({ sets: ex.sets, repMin: ex.repMin, repMax: ex.repMax, restSeconds: ex.restSeconds, sortOrder: i })
+          .where(eq(schema.exercises.id, existing.id));
+      } else {
+        await db.insert(schema.exercises).values({
+          workoutId: workout!.id,
+          name: ex.name,
+          sets: ex.sets,
+          repMin: ex.repMin,
+          repMax: ex.repMax,
+          restSeconds: ex.restSeconds,
+          sortOrder: i,
+        });
+      }
+    }
+  }
+
+  for (const s of schedule) {
+    const allSchedule = await db.select().from(schema.schedule);
+    const existingDay = allSchedule.find((row) => row.userId === targetUserId && row.day === s.day);
+    if (existingDay) {
+      await db.update(schema.schedule).set({ workoutType: s.workoutType, category: s.category }).where(eq(schema.schedule.id, existingDay.id));
+    } else {
+      await db.insert(schema.schedule).values({ userId: targetUserId, day: s.day, workoutType: s.workoutType, category: s.category });
+    }
+  }
+
+  await db.update(schema.users).set({ activeProgramId: programId }).where(eq(schema.users.id, targetUserId));
+
+  return { ok: true, data: null, summary: `Loaded program "${program.name}"` };
 }

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAppData, Exercise } from "@/lib/useAppData";
 import LoadingMark from "@/components/LoadingMark";
+import { formatDate } from "@/components/ProgressCharts";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -251,18 +252,35 @@ export default function TodayPage() {
   );
 }
 
-type InsightState = { status: "loading" } | { status: "ready"; content: string } | { status: "error" };
+type InsightState =
+  | { status: "loading" }
+  | { status: "ready"; content: string }
+  | { status: "coach"; coachName: string; content: string | null; workoutDate: string | null }
+  | { status: "error" };
 
+// If the user has an active coach, their most recent note replaces the AI-generated
+// insight entirely — a real coach's take beats a generated one whenever one exists.
 function TodayInsight() {
   const [state, setState] = useState<InsightState>({ status: "loading" });
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/today/insight")
-      .then(async (res) => {
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || "Couldn't load insight");
-        if (!cancelled) setState({ status: "ready", content: json.content });
+    fetch("/api/coach/my-coaches")
+      .then((res) => res.json())
+      .then((relationships: { status: string; coach: { name: string }; notes: { content: string; workoutDate: string | null }[] }[]) => {
+        const active = relationships.find((r) => r.status === "active");
+        if (active) {
+          const latest = active.notes[0];
+          if (!cancelled) {
+            setState({ status: "coach", coachName: active.coach.name, content: latest?.content ?? null, workoutDate: latest?.workoutDate ?? null });
+          }
+          return;
+        }
+        return fetch("/api/today/insight").then(async (res) => {
+          const json = await res.json();
+          if (!res.ok) throw new Error(json.error || "Couldn't load insight");
+          if (!cancelled) setState({ status: "ready", content: json.content });
+        });
       })
       .catch(() => {
         if (!cancelled) setState({ status: "error" });
@@ -273,6 +291,22 @@ function TodayInsight() {
   }, []);
 
   if (state.status === "error") return null;
+
+  if (state.status === "coach") {
+    return (
+      <div className="card mb-3.5 !border-[var(--coach-blue-dim)]">
+        <div className="section-label mb-2 !text-[var(--coach-blue)]">Your Coach — {state.coachName}</div>
+        {state.content ? (
+          <>
+            <p className="text-[13px] leading-relaxed">{state.content}</p>
+            {state.workoutDate && <p className="font-label text-[10px] text-[var(--muted)] mt-1">re: {formatDate(state.workoutDate)} workout</p>}
+          </>
+        ) : (
+          <p className="font-label text-xs text-[var(--muted)]">No notes yet.</p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="card mb-3.5">

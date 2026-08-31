@@ -1,21 +1,13 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
-import { db, schema } from "@/db";
 import { auth } from "@/auth";
-import { getProgramSnapshot, recordCommunityProgram, validateProgramData } from "@/lib/data";
+import { listPrograms, saveProgram, deleteProgram } from "@/lib/data";
 
 export async function GET() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const userId = Number(session.user.id);
 
-  const allPrograms = await db.select().from(schema.programs);
-  const mine = allPrograms
-    .filter((p) => p.userId === userId)
-    .map((p) => ({ id: p.id, name: p.name, createdAt: p.createdAt }))
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
-  return NextResponse.json(mine);
+  return NextResponse.json(await listPrograms(userId));
 }
 
 // body: { name, data? } — omit `data` to snapshot your current live schedule/workouts
@@ -27,36 +19,10 @@ export async function POST(req: Request) {
   const userId = Number(session.user.id);
 
   const body = await req.json();
-  const name = typeof body.name === "string" ? body.name.trim() : "";
-  if (!name) return NextResponse.json({ error: "Program name is required" }, { status: 400 });
+  const result = await saveProgram(userId, typeof body.name === "string" ? body.name : "", body.data);
+  if (!result.ok) return NextResponse.json({ error: result.error, errors: result.errors ?? [] }, { status: result.status });
 
-  const usingProvidedData = body.data !== undefined;
-  let errors: string[] = [];
-  let data;
-  if (usingProvidedData) {
-    const validated = validateProgramData(body.data);
-    data = validated.data;
-    errors = validated.errors;
-    if (data.schedule.length === 0 && data.workouts.length === 0) {
-      return NextResponse.json({ error: "Program has no valid schedule days or workouts", errors }, { status: 400 });
-    }
-  } else {
-    data = await getProgramSnapshot(userId);
-  }
-
-  const [row] = await db
-    .insert(schema.programs)
-    .values({ userId, name, data, createdAt: new Date().toISOString() })
-    .returning();
-
-  await recordCommunityProgram(data, userId);
-
-  if (!usingProvidedData) {
-    // Saving your current setup means that's the program you're now "on."
-    await db.update(schema.users).set({ activeProgramId: row.id }).where(eq(schema.users.id, userId));
-  }
-
-  return NextResponse.json({ id: row.id, name: row.name, createdAt: row.createdAt, errors });
+  return NextResponse.json(result.data);
 }
 
 // body: { id }
@@ -66,18 +32,8 @@ export async function DELETE(req: Request) {
   const userId = Number(session.user.id);
 
   const { id } = await req.json();
-  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
-
-  const allPrograms = await db.select().from(schema.programs);
-  const program = allPrograms.find((p) => p.id === id);
-  if (!program || program.userId !== userId) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-  await db.delete(schema.programs).where(eq(schema.programs.id, id));
-
-  const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
-  if (user?.activeProgramId === id) {
-    await db.update(schema.users).set({ activeProgramId: null }).where(eq(schema.users.id, userId));
-  }
+  const result = await deleteProgram(userId, id);
+  if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
 
   return NextResponse.json({ ok: true });
 }

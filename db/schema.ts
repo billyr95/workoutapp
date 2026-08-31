@@ -196,6 +196,9 @@ export const coachNotes = pgTable("coach_notes", {
   id: serial("id").primaryKey(),
   coachId: integer("coach_id").notNull(),
   clientId: integer("client_id").notNull(),
+  // Which of the client's logged workout days this note is about — feedback is grounded
+  // in a specific session, not a floating comment. Nullable for older/general notes.
+  workoutLogId: integer("workout_log_id"),
   content: text("content").notNull(),
   createdAt: text("created_at").notNull(),
 });

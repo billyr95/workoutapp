@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import LoadingMark from "@/components/LoadingMark";
 import { withMinDuration } from "@/lib/minDuration";
@@ -28,17 +26,11 @@ function formatDate(iso: string) {
 }
 
 export default function CoachingPage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
   const [relationships, setRelationships] = useState<ClientRelationship[] | null>(null);
   const [activity, setActivity] = useState<ActivityEvent[] | null>(null);
   const [username, setUsername] = useState("");
   const [inviting, setInviting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (status === "authenticated" && !session.user.isCoach) router.replace("/");
-  }, [status, session, router]);
 
   const refetch = () => {
     const fetchClients = fetch("/api/coach/clients").then((res) => res.json());
@@ -47,11 +39,10 @@ export default function CoachingPage() {
   };
 
   useEffect(() => {
-    if (status === "authenticated" && session.user.isCoach) refetch();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
+    refetch();
+  }, []);
 
-  if (status === "loading" || (status === "authenticated" && !session.user.isCoach) || relationships === null) {
+  if (relationships === null) {
     return (
       <div className="flex justify-center py-16">
         <LoadingMark className="h-10 w-auto" />
@@ -84,9 +75,7 @@ export default function CoachingPage() {
 
   return (
     <div>
-      <Link href="/" className="font-label text-[11px] text-[var(--muted)] hover:text-[var(--chalk)]">← Back to app</Link>
-
-      <div className="section-label mt-3 mb-3 !text-[var(--coach-blue)]">Coaching Dashboard</div>
+      <div className="section-label mb-3 !text-[var(--coach-blue)]">Coaching Dashboard</div>
 
       <div className="grid grid-cols-3 gap-2 mb-4">
         <Stat value={active.length} label="Clients" />

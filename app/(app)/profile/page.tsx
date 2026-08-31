@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useAppData } from "@/lib/useAppData";
 import LoadingMark from "@/components/LoadingMark";
+import { formatDate } from "@/components/ProgressCharts";
 
 export default function ProfilePage() {
   const { data, loading, refetch } = useAppData();
@@ -160,7 +161,7 @@ type CoachRelationship = {
   id: number;
   status: "pending" | "active";
   coach: { username: string | null; name: string; avatarUrl: string | null };
-  notes: { id: number; content: string; createdAt: string }[];
+  notes: { id: number; content: string; createdAt: string; workoutDate: string | null }[];
   editLog: { id: number; summary: string; createdAt: string; flagged: boolean; flagNote: string | null }[];
 };
 
@@ -223,6 +224,7 @@ function CoachSection() {
               {r.notes.map((n) => (
                 <div key={n.id} className="border-t border-[var(--line)] pt-2 mt-2 first:border-0 first:pt-0 first:mt-0">
                   <p className="text-[13px] leading-relaxed">{n.content}</p>
+                  {n.workoutDate && <p className="font-label text-[10px] text-[var(--muted)] mt-0.5">re: {formatDate(n.workoutDate)} workout</p>}
                 </div>
               ))}
             </div>
