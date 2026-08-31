@@ -7,19 +7,27 @@ import { withMinDuration } from "@/lib/minDuration";
 import { smoothPath } from "@/components/ProgressCharts";
 
 type Actor = { username: string | null; name: string; avatarUrl: string | null };
+type WeightTrend = { direction: "up" | "down" | "flat" | null; onTrack: boolean | null };
 type ClientRelationship = {
   id: number;
   status: "pending" | "active";
   invitedAt: string;
   client: Actor;
-  lastWorkoutDate: string | null;
-  workoutsThisWeek: number;
   flaggedCount: number;
+  lastActivityDate: string | null;
+  daysSinceActivity: number | null;
+  workoutsThisWeek: number;
+  scheduledDaysThisWeek: number;
+  completedDaysThisWeek: number;
+  weightTrend: WeightTrend;
 };
 type ActivityEvent =
   | { type: "workout"; id: string; date: string; client: Actor; workoutName: string }
   | { type: "cardio"; id: string; date: string; client: Actor; cardioType: string; durationMinutes: number }
   | { type: "pr"; id: string; date: string; client: Actor; exerciseName: string; weight: number; reps: number };
+type FlaggedEdit = { id: number; summary: string; flagNote: string | null; createdAt: string; client: Actor };
+
+const QUIET_THRESHOLD_DAYS = 5;
 
 function formatDate(iso: string) {
   const d = new Date(iso + "T00:00:00");
@@ -32,9 +40,23 @@ function activityLine(e: ActivityEvent) {
   return { label: "PR", detail: `${e.exerciseName} — ${e.weight}lb × ${e.reps}` };
 }
 
+function WeightTrendBadge({ trend }: { trend: WeightTrend }) {
+  if (trend.direction === null || trend.direction === "flat") {
+    return <span className="font-label text-[11px] text-[var(--muted)]">—</span>;
+  }
+  const arrow = trend.direction === "up" ? "↑" : "↓";
+  const color = trend.onTrack === true ? "var(--olive)" : trend.onTrack === false ? "var(--red)" : "var(--chalk-dim)";
+  return (
+    <span className="font-label text-[11px]" style={{ color }}>
+      {arrow} {trend.direction === "up" ? "Gaining" : "Losing"}
+    </span>
+  );
+}
+
 export default function CoachingPage() {
   const [relationships, setRelationships] = useState<ClientRelationship[] | null>(null);
   const [activity, setActivity] = useState<ActivityEvent[] | null>(null);
+  const [flagged, setFlagged] = useState<FlaggedEdit[] | null>(null);
   const [username, setUsername] = useState("");
   const [inviting, setInviting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +65,7 @@ export default function CoachingPage() {
     const fetchClients = fetch("/api/coach/clients").then((res) => res.json());
     withMinDuration(fetchClients).then(setRelationships);
     fetch("/api/coach/activity").then((res) => res.json()).then(setActivity);
+    fetch("/api/coach/flagged").then((res) => res.json()).then(setFlagged);
   };
 
   useEffect(() => {
@@ -79,6 +102,9 @@ export default function CoachingPage() {
   const pending = relationships.filter((r) => r.status === "pending");
   const active = relationships.filter((r) => r.status === "active");
   const totalFlagged = active.reduce((sum, r) => sum + r.flaggedCount, 0);
+  const goingQuiet = active
+    .filter((r) => r.daysSinceActivity === null || r.daysSinceActivity >= QUIET_THRESHOLD_DAYS)
+    .sort((a, b) => (b.daysSinceActivity ?? Infinity) - (a.daysSinceActivity ?? Infinity));
 
   const inviteForm = (
     <form onSubmit={invite} className="card !border-[var(--coach-blue-dim)] mb-4">
@@ -113,11 +139,55 @@ export default function CoachingPage() {
     <div>
       <div className="section-label mb-3 !text-[var(--coach-blue)]">Coaching Dashboard</div>
 
-      <div className="grid grid-cols-3 gap-2 lg:gap-3 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-3 mb-4">
         <Stat value={active.length} label="Clients" />
-        <Stat value={pending.length} label="Pending" />
+        <Stat value={goingQuiet.length} label="Going Quiet" accent={goingQuiet.length > 0} />
         <Stat value={totalFlagged} label="Flagged" accent={totalFlagged > 0} />
+        <Stat value={pending.length} label="Pending" />
       </div>
+
+      {goingQuiet.length > 0 && (
+        <div className="mb-4">
+          <div className="section-label mb-3 !text-[var(--red)]">Going Quiet</div>
+          {goingQuiet.map((r) => (
+            <Link
+              key={r.id}
+              href={`/coaching/${r.client.username}`}
+              className="card !py-3 !px-3.5 mb-2 flex items-center gap-3 !border-[var(--red-dim)] hover:!border-[var(--red)]"
+            >
+              <Avatar name={r.client.name} avatarUrl={r.client.avatarUrl} />
+              <div className="min-w-0 flex-1">
+                <div className="font-label text-[13px]">{r.client.name}</div>
+                <div className="font-label text-[11px] text-[var(--red)]">
+                  {r.daysSinceActivity === null ? "No activity logged yet" : `${r.daysSinceActivity} days since last activity`}
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {flagged && flagged.length > 0 && (
+        <div className="mb-4">
+          <div className="section-label mb-3 !text-[var(--coach-blue)]">Flagged Edits — Needs Review</div>
+          {flagged.map((f) => (
+            <Link
+              key={f.id}
+              href={`/coaching/${f.client.username}`}
+              className="card !py-3 !px-3.5 mb-2 flex items-start gap-3 hover:!border-[var(--coach-blue)]"
+            >
+              <Avatar name={f.client.name} avatarUrl={f.client.avatarUrl} />
+              <div className="min-w-0 flex-1">
+                <div className="font-label text-[13px]">
+                  <span className="font-semibold">{f.client.name}</span> flagged: {f.summary}
+                </div>
+                {f.flagNote && <p className="font-label text-[11px] text-[var(--red)] mt-0.5">&ldquo;{f.flagNote}&rdquo;</p>}
+                <div className="font-label text-[11px] text-[var(--muted)] mt-0.5">{formatDate(f.createdAt.slice(0, 10))}</div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* Desktop: chart + invite/pending rail side by side. Mobile keeps the simple stack below. */}
       <div className="hidden lg:grid lg:grid-cols-3 lg:gap-4 lg:mb-6">
@@ -138,11 +208,13 @@ export default function CoachingPage() {
         {pendingList}
       </div>
 
+      <div className="section-label mb-3 !text-[var(--coach-blue)]">Clients</div>
+      {active.length === 0 && (
+        <div className="card text-center text-[var(--muted)] font-label text-xs mb-4">No active clients yet.</div>
+      )}
+
+      {/* Mobile: cards */}
       <div className="lg:hidden">
-        <div className="section-label mb-3 !text-[var(--coach-blue)]">Clients</div>
-        {active.length === 0 && (
-          <div className="card text-center text-[var(--muted)] font-label text-xs mb-4">No active clients yet.</div>
-        )}
         {active.map((r) => (
           <Link
             key={r.id}
@@ -153,15 +225,67 @@ export default function CoachingPage() {
             <div className="min-w-0 flex-1">
               <div className="font-label text-[13px]">{r.client.name}</div>
               <div className="font-label text-[11px] text-[var(--chalk-dim)]">
-                {r.lastWorkoutDate ? `Last workout ${formatDate(r.lastWorkoutDate)}` : "No workouts logged"} · {r.workoutsThisWeek} this week
+                {r.scheduledDaysThisWeek > 0
+                  ? `${r.completedDaysThisWeek}/${r.scheduledDaysThisWeek} scheduled days this week`
+                  : `${r.workoutsThisWeek} workout${r.workoutsThisWeek === 1 ? "" : "s"} this week`}
               </div>
             </div>
-            {r.flaggedCount > 0 && (
-              <span className="font-label text-[10px] uppercase tracking-wide text-[var(--red)] shrink-0">{r.flaggedCount} flagged</span>
-            )}
+            <div className="flex flex-col items-end gap-0.5 shrink-0">
+              <WeightTrendBadge trend={r.weightTrend} />
+              {r.flaggedCount > 0 && (
+                <span className="font-label text-[10px] uppercase tracking-wide text-[var(--red)]">{r.flaggedCount} flagged</span>
+              )}
+            </div>
           </Link>
         ))}
       </div>
+
+      {/* Desktop: table */}
+      {active.length > 0 && (
+        <div className="hidden lg:block card !border-[var(--coach-blue-dim)] !p-0 overflow-hidden mb-4">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-[var(--coach-blue-dim)]">
+                <th className="text-left font-label text-[10px] uppercase tracking-wide text-[var(--muted)] px-4 py-3">Client</th>
+                <th className="text-left font-label text-[10px] uppercase tracking-wide text-[var(--muted)] px-4 py-3">Last Activity</th>
+                <th className="text-left font-label text-[10px] uppercase tracking-wide text-[var(--muted)] px-4 py-3">Adherence</th>
+                <th className="text-left font-label text-[10px] uppercase tracking-wide text-[var(--muted)] px-4 py-3">Weight Trend</th>
+                <th className="text-right font-label text-[10px] uppercase tracking-wide text-[var(--muted)] px-4 py-3">Flags</th>
+              </tr>
+            </thead>
+            <tbody>
+              {active.map((r) => (
+                <tr key={r.id} className="border-b border-[var(--line)] last:border-b-0 hover:bg-[var(--surface2)]">
+                  <td className="px-4 py-3">
+                    <Link href={`/coaching/${r.client.username}`} className="flex items-center gap-2.5 hover:underline">
+                      <Avatar name={r.client.name} avatarUrl={r.client.avatarUrl} small />
+                      <span className="font-label text-[12px]">{r.client.name}</span>
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3 font-label text-[12px] text-[var(--chalk-dim)]">
+                    {r.daysSinceActivity === null
+                      ? "No activity yet"
+                      : r.daysSinceActivity === 0
+                        ? "Today"
+                        : `${r.daysSinceActivity}d ago`}
+                  </td>
+                  <td className="px-4 py-3 font-label text-[12px] text-[var(--chalk-dim)]">
+                    {r.scheduledDaysThisWeek > 0 ? `${r.completedDaysThisWeek}/${r.scheduledDaysThisWeek} this week` : "—"}
+                  </td>
+                  <td className="px-4 py-3"><WeightTrendBadge trend={r.weightTrend} /></td>
+                  <td className="px-4 py-3 text-right">
+                    {r.flaggedCount > 0 ? (
+                      <span className="font-label text-[11px] uppercase tracking-wide text-[var(--red)]">{r.flaggedCount}</span>
+                    ) : (
+                      <span className="font-label text-[11px] text-[var(--muted)]">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div className="section-label mb-3 mt-4 !text-[var(--coach-blue)]">Recent Activity</div>
       {activity === null ? (

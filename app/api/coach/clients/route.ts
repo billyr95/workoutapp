@@ -1,43 +1,49 @@
 import { NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { auth } from "@/auth";
+import { computeClientDashboardStats } from "@/lib/data";
 
 // GET — the coach's client relationships (pending + active), each with the client's public info
-// and, for active ones, quick stats for the dashboard (last workout, this week's count, flags).
+// and, for active ones, dashboard stats: activity freshness, adherence, weight trend, flags.
 export async function GET() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!session.user.isCoach) return NextResponse.json({ error: "Not a coach" }, { status: 403 });
   const coachId = Number(session.user.id);
 
-  const [relationships, allUsers, allWorkoutLogs, allEditLog] = await Promise.all([
+  const [relationships, allUsers, allWorkoutLogs, allCardioLogs, allSchedule, allWeightLogs, allEditLog] = await Promise.all([
     db.select().from(schema.coachRelationships),
     db.select().from(schema.users),
     db.select().from(schema.workoutLogs),
+    db.select().from(schema.cardioLogs),
+    db.select().from(schema.schedule),
+    db.select().from(schema.weightLogs),
     db.select().from(schema.programEditLog),
   ]);
   const userById = new Map(allUsers.map((u) => [u.id, u]));
-
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 6);
-  const weekAgoStr = weekAgo.toISOString().slice(0, 10);
 
   const mine = relationships
     .filter((r) => r.coachId === coachId && r.status !== "declined")
     .map((r) => {
       const client = userById.get(r.clientId);
-      const clientLogs = r.status === "active" ? allWorkoutLogs.filter((l) => l.userId === r.clientId) : [];
-      const lastWorkoutDate = clientLogs.length > 0 ? clientLogs.reduce((max, l) => (l.date > max ? l.date : max), clientLogs[0].date) : null;
-      const workoutsThisWeek = clientLogs.filter((l) => l.date >= weekAgoStr).length;
       const flaggedCount = allEditLog.filter((e) => e.coachId === coachId && e.clientId === r.clientId && e.flagged).length;
+      const stats =
+        r.status === "active" && client
+          ? computeClientDashboardStats(
+              client,
+              allWorkoutLogs.filter((l) => l.userId === r.clientId),
+              allCardioLogs.filter((c) => c.userId === r.clientId),
+              allSchedule.filter((s) => s.userId === r.clientId),
+              allWeightLogs.filter((w) => w.userId === r.clientId)
+            )
+          : null;
       return {
         id: r.id,
         status: r.status,
         invitedAt: r.invitedAt,
         client: client ? { username: client.username, name: client.name, avatarUrl: client.avatarUrl } : null,
-        lastWorkoutDate,
-        workoutsThisWeek,
         flaggedCount,
+        ...stats,
       };
     })
     .filter((r) => r.client !== null)

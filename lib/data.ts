@@ -385,6 +385,80 @@ export async function getActiveCoachClients(coachId: number) {
     .map((u) => ({ username: u.username, name: u.name, avatarUrl: u.avatarUrl }));
 }
 
+export type ClientDashboardStats = {
+  lastActivityDate: string | null;
+  daysSinceActivity: number | null;
+  workoutsThisWeek: number;
+  scheduledDaysThisWeek: number;
+  completedDaysThisWeek: number;
+  weightTrend: { direction: "up" | "down" | "flat" | null; onTrack: boolean | null };
+};
+
+// Powers the coaching dashboard's "going quiet" flags, adherence rate, and weight-trend
+// indicator — takes each table pre-filtered to one client so the coach dashboard route can
+// fetch every table once and reuse it across all of its clients, instead of re-querying per client.
+export function computeClientDashboardStats(
+  client: { startingWeight: number; goalWeight: number },
+  workoutLogs: { date: string }[],
+  cardioLogs: { date: string }[],
+  schedule: { day: string; workoutType: string }[],
+  weightLogs: { date: string; weight: number }[]
+): ClientDashboardStats {
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+
+  const activityDates = new Set([...workoutLogs.map((l) => l.date), ...cardioLogs.map((c) => c.date)]);
+  const lastActivityDate = activityDates.size > 0 ? [...activityDates].reduce((max, d) => (d > max ? d : max)) : null;
+  const daysSinceActivity = lastActivityDate
+    ? Math.floor((new Date(todayStr).getTime() - new Date(lastActivityDate).getTime()) / 86400000)
+    : null;
+
+  const weekAgo = new Date(today);
+  weekAgo.setDate(weekAgo.getDate() - 6);
+  const weekAgoStr = weekAgo.toISOString().slice(0, 10);
+  const workoutsThisWeek = workoutLogs.filter((l) => l.date >= weekAgoStr).length;
+
+  // Adherence: for each of the trailing 7 calendar days that the client's weekly split actually
+  // scheduled as a workout/cardio day (not Rest), did they log anything that day?
+  const scheduledByDay = new Map(schedule.map((s) => [s.day, s.workoutType !== "Rest"]));
+  let scheduledDaysThisWeek = 0;
+  let completedDaysThisWeek = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dayName = VALID_DAYS[d.getDay()];
+    if (!scheduledByDay.get(dayName)) continue;
+    scheduledDaysThisWeek++;
+    if (activityDates.has(d.toISOString().slice(0, 10))) completedDaysThisWeek++;
+  }
+
+  // Weight trend over the last 30 days, checked against whether their stated goal is to
+  // gain or lose relative to their starting weight (flat goal = no meaningful "on track").
+  const monthAgo = new Date(today);
+  monthAgo.setDate(monthAgo.getDate() - 30);
+  const monthAgoStr = monthAgo.toISOString().slice(0, 10);
+  const recentWeights = weightLogs.filter((w) => w.date >= monthAgoStr).sort((a, b) => a.date.localeCompare(b.date));
+  let direction: "up" | "down" | "flat" | null = null;
+  if (recentWeights.length >= 2) {
+    const delta = recentWeights[recentWeights.length - 1].weight - recentWeights[0].weight;
+    direction = delta > 0.5 ? "up" : delta < -0.5 ? "down" : "flat";
+  }
+  const goalDirection = client.goalWeight > client.startingWeight ? "gain" : client.goalWeight < client.startingWeight ? "lose" : "maintain";
+  let onTrack: boolean | null = null;
+  if (direction !== null && goalDirection !== "maintain") {
+    onTrack = (goalDirection === "gain" && direction === "up") || (goalDirection === "lose" && direction === "down");
+  }
+
+  return {
+    lastActivityDate,
+    daysSinceActivity,
+    workoutsThisWeek,
+    scheduledDaysThisWeek,
+    completedDaysThisWeek,
+    weightTrend: { direction, onTrack },
+  };
+}
+
 type MutationResult<T> = { ok: true; data: T; summary: string } | { ok: false; error: string; status: number; errors?: string[] };
 
 // Shared by the self-service /api/schedule route (targetUserId = session user) and the
