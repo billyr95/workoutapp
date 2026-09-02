@@ -217,12 +217,12 @@ export function WeightChart({ weights, hasHistory }: { weights: { date: string; 
 
 export type SessionSetGroup = { name: string; sets: { setNumber: number; weight: number; reps: number }[] };
 
-type SetPoint = { x: number; y: number; weight: number; reps: number };
-type SetLine = { name: string; color: string; pts: SetPoint[] };
+type SetDatum = { x: number; yWeight: number; yReps: number; weight: number; reps: number };
+type SetLine = { name: string; color: string; pts: SetDatum[] };
 
 // Every set from one logged session, grouped by exercise and connected as a line per exercise —
-// set-by-set shape within a workout (warm-ups vs. working sets), with an optional second session
-// overlaid (dashed, hollow points) so two sessions of the same workout can be compared set-for-set.
+// weight on the left axis (filled circles), reps on the right axis (hollow squares) — with an
+// optional second session overlaid (dashed strokes) so two sessions can be compared set-for-set.
 export function SessionSetsChart({
   groups,
   compareGroups,
@@ -234,7 +234,7 @@ export function SessionSetsChart({
   primaryLabel?: string;
   compareLabel?: string;
 }) {
-  const [hover, setHover] = useState<(Hover & { compare?: boolean }) | null>(null);
+  const [hover, setHover] = useState<Hover | null>(null);
   const [pinned, setPinned] = useState(false);
   const gradientPrefix = useId();
 
@@ -243,22 +243,25 @@ export function SessionSetsChart({
     .map((primary) => ({ primary, compare: compareByName.get(primary.name) ?? null }))
     .filter(({ primary, compare }) => primary.sets.length > 0 || (compare?.sets.length ?? 0) > 0);
 
-  const allWeights = visibleGroups.flatMap(({ primary, compare }) => [...primary.sets, ...(compare?.sets ?? [])].map((s) => s.weight));
-  if (allWeights.length === 0) {
+  const allSets = visibleGroups.flatMap(({ primary, compare }) => [...primary.sets, ...(compare?.sets ?? [])]);
+  if (allSets.length === 0) {
     return <div className="text-center text-[var(--muted)] font-label text-xs py-6">No sets logged for this session.</div>;
   }
 
-  const h = 196, padTop = 16, padBottom = 32, padLeft = 32, padRight = 16;
+  const h = 196, padTop = 16, padBottom = 32, padLeft = 32, padRight = 30;
   const slotW = 30, groupGap = 28;
 
   const primaryLines: SetLine[] = [];
   const compareLines: SetLine[] = [];
   const groupLabels: { x: number; text: string }[] = [];
 
-  const maxW = Math.max(...allWeights) * 1.1 || 1;
+  const maxW = Math.max(...allSets.map((s) => s.weight)) * 1.1 || 1;
   const midW = maxW / 2;
+  const maxReps = Math.max(...allSets.map((s) => s.reps)) * 1.15 || 1;
+  const midReps = maxReps / 2;
   const plotBottom = h - padBottom;
   const yFor = (weight: number) => plotBottom - (weight / maxW) * (h - padTop - padBottom);
+  const yForReps = (reps: number) => plotBottom - (reps / maxReps) * (h - padTop - padBottom);
 
   let x = padLeft;
   visibleGroups.forEach(({ primary, compare }, gi) => {
@@ -266,20 +269,15 @@ export function SessionSetsChart({
     const color = colorForLift(primary.name);
     const slotCount = Math.max(primary.sets.length, compare?.sets.length ?? 0, 1);
     const startX = x;
-    if (primary.sets.length > 0) {
-      primaryLines.push({
-        name: primary.name,
-        color,
-        pts: primary.sets.map((s) => ({ x: startX + (s.setNumber - 1) * slotW, y: yFor(s.weight), weight: s.weight, reps: s.reps })),
-      });
-    }
-    if (compare && compare.sets.length > 0) {
-      compareLines.push({
-        name: compare.name,
-        color,
-        pts: compare.sets.map((s) => ({ x: startX + (s.setNumber - 1) * slotW, y: yFor(s.weight), weight: s.weight, reps: s.reps })),
-      });
-    }
+    const toDatum = (s: { setNumber: number; weight: number; reps: number }): SetDatum => ({
+      x: startX + (s.setNumber - 1) * slotW,
+      yWeight: yFor(s.weight),
+      yReps: yForReps(s.reps),
+      weight: s.weight,
+      reps: s.reps,
+    });
+    if (primary.sets.length > 0) primaryLines.push({ name: primary.name, color, pts: primary.sets.map(toDatum) });
+    if (compare && compare.sets.length > 0) compareLines.push({ name: compare.name, color, pts: compare.sets.map(toDatum) });
     const endX = startX + (slotCount - 1) * slotW;
     groupLabels.push({ x: (startX + endX) / 2, text: primary.name });
     x = endX;
@@ -287,14 +285,14 @@ export function SessionSetsChart({
   const contentWidth = x + padRight;
   const w = Math.max(500, contentWidth);
 
-  function show(pt: SetPoint, name: string, setNumber: number, isCompare: boolean) {
+  function show(pt: SetDatum, name: string, setNumber: number, isCompare: boolean, atReps: boolean) {
     const label = isCompare ? compareLabel : primaryLabel;
-    setHover({ x: pt.x, y: pt.y, title: `${pt.weight}lb × ${pt.reps}`, subtitle: `${name} · Set ${setNumber} · ${label}`, compare: isCompare });
+    setHover({ x: pt.x, y: atReps ? pt.yReps : pt.yWeight, title: `${pt.weight}lb × ${pt.reps}`, subtitle: `${name} · Set ${setNumber} · ${label}` });
   }
   function hide() {
     if (!pinned) setHover(null);
   }
-  function togglePin(pt: SetPoint, name: string, setNumber: number, isCompare: boolean) {
+  function togglePin(pt: SetDatum, name: string, setNumber: number, isCompare: boolean, atReps: boolean) {
     const label = isCompare ? compareLabel : primaryLabel;
     const title = `${pt.weight}lb × ${pt.reps}`;
     const subtitle = `${name} · Set ${setNumber} · ${label}`;
@@ -303,37 +301,63 @@ export function SessionSetsChart({
         setHover(null);
         return false;
       }
-      setHover({ x: pt.x, y: pt.y, title, subtitle, compare: isCompare });
+      setHover({ x: pt.x, y: atReps ? pt.yReps : pt.yWeight, title, subtitle });
       return true;
     });
   }
 
-  function renderPoints(line: SetLine, lineIndex: number, isCompare: boolean) {
+  function hitTarget(pt: SetDatum, y: number, line: SetLine, i: number, isCompare: boolean, atReps: boolean) {
+    return (
+      <circle
+        cx={pt.x}
+        cy={y}
+        r={10}
+        fill="transparent"
+        className="cursor-pointer"
+        tabIndex={0}
+        role="button"
+        aria-label={`${line.name} set ${i + 1}: ${pt.weight} pounds by ${pt.reps} reps${isCompare ? ` (${compareLabel})` : ""}`}
+        onMouseEnter={(e) => { e.stopPropagation(); show(pt, line.name, i + 1, isCompare, atReps); }}
+        onMouseLeave={hide}
+        onFocus={(e) => { e.stopPropagation(); show(pt, line.name, i + 1, isCompare, atReps); }}
+        onBlur={hide}
+        onClick={(e) => { e.stopPropagation(); togglePin(pt, line.name, i + 1, isCompare, atReps); }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); togglePin(pt, line.name, i + 1, isCompare, atReps); }
+        }}
+      />
+    );
+  }
+
+  function renderWeightPoints(line: SetLine, isCompare: boolean) {
     return line.pts.map((pt, i) => (
       <g key={i}>
         {isCompare ? (
-          <circle cx={pt.x} cy={pt.y} r={4} fill="var(--surface)" stroke={line.color} strokeWidth={2} />
+          <circle cx={pt.x} cy={pt.yWeight} r={4} fill="var(--surface)" stroke={line.color} strokeWidth={2} />
         ) : (
-          <circle cx={pt.x} cy={pt.y} r={4} fill={line.color} stroke="var(--surface)" strokeWidth={2} />
+          <circle cx={pt.x} cy={pt.yWeight} r={4} fill={line.color} stroke="var(--surface)" strokeWidth={2} />
         )}
-        <circle
-          cx={pt.x}
-          cy={pt.y}
-          r={10}
-          fill="transparent"
-          className="cursor-pointer"
-          tabIndex={0}
-          role="button"
-          aria-label={`${line.name} set ${i + 1}: ${pt.weight} pounds by ${pt.reps} reps${isCompare ? ` (${compareLabel})` : ""}`}
-          onMouseEnter={(e) => { e.stopPropagation(); show(pt, line.name, i + 1, isCompare); }}
-          onMouseLeave={hide}
-          onFocus={(e) => { e.stopPropagation(); show(pt, line.name, i + 1, isCompare); }}
-          onBlur={hide}
-          onClick={(e) => { e.stopPropagation(); togglePin(pt, line.name, i + 1, isCompare); }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); togglePin(pt, line.name, i + 1, isCompare); }
-          }}
+        {hitTarget(pt, pt.yWeight, line, i, isCompare, false)}
+      </g>
+    ));
+  }
+
+  function renderRepsPoints(line: SetLine, isCompare: boolean) {
+    const s = 5.5;
+    return line.pts.map((pt, i) => (
+      <g key={i}>
+        <rect
+          x={pt.x - s / 2}
+          y={pt.yReps - s / 2}
+          width={s}
+          height={s}
+          transform={`rotate(45 ${pt.x} ${pt.yReps})`}
+          fill={isCompare ? "var(--surface)" : line.color}
+          stroke={line.color}
+          strokeWidth={1.5}
+          opacity={isCompare ? 0.7 : 0.85}
         />
+        {hitTarget(pt, pt.yReps, line, i, isCompare, true)}
       </g>
     ));
   }
@@ -341,7 +365,7 @@ export function SessionSetsChart({
   return (
     <div className="relative">
       <div className="overflow-x-auto">
-        <div style={{ width: w }}>
+        <div style={contentWidth > 500 ? { width: w } : undefined}>
           <svg
             viewBox={`0 0 ${w} ${h}`}
             className="w-full h-auto"
@@ -358,27 +382,40 @@ export function SessionSetsChart({
               ))}
             </defs>
             {[0, midW, maxW].map((v, i) => (
-              <g key={i}>
-                <line x1={padLeft} y1={yFor(v)} x2={w - padRight} y2={yFor(v)} stroke="var(--line)" strokeWidth={1} />
-                <text x={padLeft} y={yFor(v) - 4} fill="var(--muted)" fontFamily="Manrope" fontSize={10}>{Math.round(v)}lb</text>
-              </g>
+              <line key={i} x1={padLeft} y1={yFor(v)} x2={w - padRight} y2={yFor(v)} stroke="var(--line)" strokeWidth={1} />
+            ))}
+            {[0, midW, maxW].map((v, i) => (
+              <text key={i} x={padLeft} y={yFor(v) - 4} fill="var(--muted)" fontFamily="Manrope" fontSize={10}>{Math.round(v)}lb</text>
+            ))}
+            {[0, midReps, maxReps].map((v, i) => (
+              <text key={i} x={w - padRight} y={yForReps(v) - 4} textAnchor="end" fill="var(--muted)" fontFamily="Manrope" fontSize={10}>{Math.round(v)}</text>
             ))}
             {compareLines.map((line) => {
-              const path = smoothPath(line.pts.map((p) => [p.x, p.y] as const));
-              return <path key={line.name} d={path} fill="none" stroke={line.color} strokeWidth={2} strokeDasharray="4 3" strokeLinecap="round" opacity={0.55} />;
-            })}
-            {primaryLines.map((line, i) => {
-              const path = smoothPath(line.pts.map((p) => [p.x, p.y] as const));
-              const areaPath = line.pts.length > 1 ? `${path} L ${line.pts[line.pts.length - 1].x} ${plotBottom} L ${line.pts[0].x} ${plotBottom} Z` : "";
+              const weightPath = smoothPath(line.pts.map((p) => [p.x, p.yWeight] as const));
+              const repsPath = smoothPath(line.pts.map((p) => [p.x, p.yReps] as const));
               return (
                 <g key={line.name}>
-                  {line.pts.length > 1 && <path d={areaPath} fill={`url(#${gradientPrefix}-${i})`} stroke="none" />}
-                  <path d={path} fill="none" stroke={line.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />
+                  <path d={weightPath} fill="none" stroke={line.color} strokeWidth={2} strokeDasharray="4 3" strokeLinecap="round" opacity={0.55} />
+                  <path d={repsPath} fill="none" stroke={line.color} strokeWidth={1.5} strokeDasharray="2 3" strokeLinecap="round" opacity={0.45} />
                 </g>
               );
             })}
-            {compareLines.map((line, i) => <g key={i}>{renderPoints(line, i, true)}</g>)}
-            {primaryLines.map((line, i) => <g key={i}>{renderPoints(line, i, false)}</g>)}
+            {primaryLines.map((line, i) => {
+              const weightPath = smoothPath(line.pts.map((p) => [p.x, p.yWeight] as const));
+              const repsPath = smoothPath(line.pts.map((p) => [p.x, p.yReps] as const));
+              const areaPath = line.pts.length > 1 ? `${weightPath} L ${line.pts[line.pts.length - 1].x} ${plotBottom} L ${line.pts[0].x} ${plotBottom} Z` : "";
+              return (
+                <g key={line.name}>
+                  {line.pts.length > 1 && <path d={areaPath} fill={`url(#${gradientPrefix}-${i})`} stroke="none" />}
+                  <path d={weightPath} fill="none" stroke={line.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />
+                  <path d={repsPath} fill="none" stroke={line.color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" opacity={0.6} />
+                </g>
+              );
+            })}
+            {compareLines.map((line, i) => <g key={`cr-${i}`}>{renderRepsPoints(line, true)}</g>)}
+            {primaryLines.map((line, i) => <g key={`pr-${i}`}>{renderRepsPoints(line, false)}</g>)}
+            {compareLines.map((line, i) => <g key={`cw-${i}`}>{renderWeightPoints(line, true)}</g>)}
+            {primaryLines.map((line, i) => <g key={`pw-${i}`}>{renderWeightPoints(line, false)}</g>)}
             {groupLabels.map((l, i) => (
               <text key={i} x={l.x} y={h - padBottom + 16} textAnchor="middle" fill="var(--muted)" fontFamily="Manrope" fontSize={9}>{l.text}</text>
             ))}
@@ -386,12 +423,16 @@ export function SessionSetsChart({
         </div>
       </div>
       {hover && <ChartTooltip x={hover.x} y={hover.y} w={w} h={h} title={hover.title} subtitle={hover.subtitle} />}
-      {compareLines.length > 0 && (
-        <div className="flex items-center gap-3 mt-2 font-label text-[10px] text-[var(--muted)]">
-          <span className="flex items-center gap-1.5"><span className="inline-block w-3 border-t-2 border-[var(--chalk-dim)]" /> {primaryLabel}</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block w-3 border-t-2 border-dashed border-[var(--muted)]" /> {compareLabel}</span>
-        </div>
-      )}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 font-label text-[10px] text-[var(--muted)]">
+        <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-[var(--chalk-dim)]" /> Weight (lb)</span>
+        <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rotate-45 border border-[var(--chalk-dim)]" /> Reps</span>
+        {compareLines.length > 0 && (
+          <>
+            <span className="flex items-center gap-1.5"><span className="inline-block w-3 border-t-2 border-[var(--chalk-dim)]" /> {primaryLabel}</span>
+            <span className="flex items-center gap-1.5"><span className="inline-block w-3 border-t-2 border-dashed border-[var(--muted)]" /> {compareLabel}</span>
+          </>
+        )}
+      </div>
     </div>
   );
 }
