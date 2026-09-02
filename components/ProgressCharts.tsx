@@ -248,7 +248,7 @@ export function SessionSetsChart({
     return <div className="text-center text-[var(--muted)] font-label text-xs py-6">No sets logged for this session.</div>;
   }
 
-  const h = 196, padTop = 16, padBottom = 32, padLeft = 32, padRight = 30;
+  const h = 240, padTop = 16, padBottom = 32, padLeft = 32, padRight = 30;
   const slotW = 30, groupGap = 28;
 
   const primaryLines: SetLine[] = [];
@@ -454,7 +454,7 @@ export function LiftProgressChart({ series, selected }: { series: Map<string, Li
     );
   }
 
-  const w = 500, h = 196, pad = 24, padRight = pad + 34;
+  const w = 500, h = 240, pad = 24, padRight = pad + 34;
   const allPoints = active.flatMap((s) => s.points);
   const dates = allPoints.map((p) => new Date(p.date).getTime());
   const minDate = Math.min(...dates), maxDate = Math.max(...dates);

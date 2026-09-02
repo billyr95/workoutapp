@@ -222,11 +222,33 @@ function buildSessionGroups(workout: Workout, session: WorkoutLog): SessionSetGr
   }));
 }
 
+type ChartView = "trend" | "last";
+
+// Trend vs. Last Workout switch between two mutually-exclusive full-width views instead of
+// stacking one below the other, so whichever is showing gets the full card to itself.
+function ChartViewTabs({ view, onChange }: { view: ChartView; onChange: (v: ChartView) => void }) {
+  return (
+    <div className="flex gap-2 mb-3">
+      {(["trend", "last"] as const).map((v) => (
+        <button
+          key={v}
+          type="button"
+          onClick={() => onChange(v)}
+          className="btn-ghost flex-1 !py-1.5 !text-[12px] normal-case tracking-normal rounded"
+          style={view === v ? { borderColor: "var(--olive)", color: "var(--olive)" } : undefined}
+        >
+          {v === "trend" ? "Trend" : "Last Workout"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // Keyed by workout id from the parent so switching workouts remounts this with fresh state,
 // instead of stale range/session selections leaking across workouts.
 function WorkoutDetail({ workout, logs, liftSeries }: { workout: Workout; logs: WorkoutLog[]; liftSeries: Map<string, LiftPoint[]> }) {
+  const [view, setView] = useState<ChartView>("trend");
   const [range, setRange] = useState(DEFAULT_WORKOUT_RANGE);
-  const [showLast, setShowLast] = useState(false);
   const [sessionId, setSessionId] = useState<number | null>(() => logs[0]?.id ?? null);
   const [comparing, setComparing] = useState(false);
   const [compareSessionId, setCompareSessionId] = useState<number | null>(null);
@@ -248,68 +270,68 @@ function WorkoutDetail({ workout, logs, liftSeries }: { workout: Workout; logs: 
 
   return (
     <div>
-      <div className="flex items-center justify-between !gap-3 mb-2">
-        <span className="font-label text-[12px] text-[var(--muted)]">{workout.name}</span>
-        <select
-          value={range}
-          onChange={(e) => setRange(e.target.value)}
-          className="!w-auto max-w-[130px] !py-1 !px-2 !text-[11px] normal-case tracking-normal"
-        >
-          {WORKOUT_RANGE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-      </div>
-      <div className="card mb-3">
-        <LiftProgressChart series={filteredSeries} selected={exerciseNames} />
-      </div>
+      <ChartViewTabs view={view} onChange={setView} />
 
-      <button className="btn-ghost w-full rounded mb-3" onClick={() => setShowLast((v) => !v)}>
-        {showLast ? "Hide Last Workout" : "Show Last Workout"}
-      </button>
-
-      {showLast && (
-        logs.length === 0 ? (
-          <div className="card text-center text-[var(--muted)] font-label text-xs">No sessions logged for this workout yet.</div>
-        ) : (
+      {view === "trend" ? (
+        <>
+          <div className="flex items-center justify-between !gap-3 mb-2">
+            <span className="font-label text-[12px] text-[var(--muted)]">{workout.name}</span>
+            <select
+              value={range}
+              onChange={(e) => setRange(e.target.value)}
+              className="!w-auto max-w-[130px] !py-1 !px-2 !text-[11px] normal-case tracking-normal"
+            >
+              {WORKOUT_RANGE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
           <div className="card">
-            <div className="flex items-center justify-between !gap-3 mb-2">
-              <span className="font-label text-[11px] text-[var(--muted)]">Session</span>
-              <div className="flex items-center gap-2">
-                <select
-                  value={session?.id}
-                  onChange={(e) => setSessionId(Number(e.target.value))}
-                  className="!w-auto max-w-[160px] !py-1 !px-2 !text-[11px] normal-case tracking-normal"
+            <LiftProgressChart series={filteredSeries} selected={exerciseNames} />
+          </div>
+        </>
+      ) : logs.length === 0 ? (
+        <div className="card text-center text-[var(--muted)] font-label text-xs">No sessions logged for this workout yet.</div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between !gap-3 mb-2">
+            <span className="font-label text-[11px] text-[var(--muted)]">Session</span>
+            <div className="flex items-center gap-2">
+              <select
+                value={session?.id}
+                onChange={(e) => setSessionId(Number(e.target.value))}
+                className="!w-auto max-w-[160px] !py-1 !px-2 !text-[11px] normal-case tracking-normal"
+              >
+                {logs.map((l) => (
+                  <option key={l.id} value={l.id}>{formatDate(l.date, true)}</option>
+                ))}
+              </select>
+              {otherLogs.length > 0 && (
+                <button
+                  type="button"
+                  className="btn-ghost !py-1 !px-2.5 !text-[11px] normal-case tracking-normal rounded shrink-0"
+                  onClick={() => setComparing((v) => !v)}
                 >
-                  {logs.map((l) => (
-                    <option key={l.id} value={l.id}>{formatDate(l.date, true)}</option>
-                  ))}
-                </select>
-                {otherLogs.length > 0 && (
-                  <button
-                    type="button"
-                    className="btn-ghost !py-1 !px-2.5 !text-[11px] normal-case tracking-normal rounded shrink-0"
-                    onClick={() => setComparing((v) => !v)}
-                  >
-                    {comparing ? "Hide Compare" : "Compare"}
-                  </button>
-                )}
-              </div>
+                  {comparing ? "Hide Compare" : "Compare"}
+                </button>
+              )}
             </div>
-            {comparing && otherLogs.length > 0 && (
-              <div className="flex items-center justify-between !gap-3 mb-2">
-                <span className="font-label text-[11px] text-[var(--muted)]">Compare to</span>
-                <select
-                  value={compareSession?.id}
-                  onChange={(e) => setCompareSessionId(Number(e.target.value))}
-                  className="!w-auto max-w-[160px] !py-1 !px-2 !text-[11px] normal-case tracking-normal"
-                >
-                  {otherLogs.map((l) => (
-                    <option key={l.id} value={l.id}>{formatDate(l.date, true)}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+          </div>
+          {comparing && otherLogs.length > 0 && (
+            <div className="flex items-center justify-between !gap-3 mb-2">
+              <span className="font-label text-[11px] text-[var(--muted)]">Compare to</span>
+              <select
+                value={compareSession?.id}
+                onChange={(e) => setCompareSessionId(Number(e.target.value))}
+                className="!w-auto max-w-[160px] !py-1 !px-2 !text-[11px] normal-case tracking-normal"
+              >
+                {otherLogs.map((l) => (
+                  <option key={l.id} value={l.id}>{formatDate(l.date, true)}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="card">
             <SessionSetsChart
               groups={sessionGroups}
               compareGroups={compareGroups}
@@ -317,7 +339,7 @@ function WorkoutDetail({ workout, logs, liftSeries }: { workout: Workout; logs: 
               compareLabel={compareSession ? formatDate(compareSession.date, true) : "Compare"}
             />
           </div>
-        )
+        </>
       )}
     </div>
   );
@@ -351,7 +373,7 @@ function PersonalRecordRow({
   workoutLogs: WorkoutLog[];
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [showLast, setShowLast] = useState(false);
+  const [view, setView] = useState<ChartView>("trend");
   const [sessionId, setSessionId] = useState<number | null>(null);
   const chartable = points.length > 0;
 
@@ -374,32 +396,28 @@ function PersonalRecordRow({
       </button>
       {expanded && chartable && (
         <div className="mt-3">
-          <LiftProgressChart series={new Map([[record.exerciseName, points]])} selected={[record.exerciseName]} />
+          <ChartViewTabs view={view} onChange={setView} />
 
-          <button type="button" className="btn-ghost w-full rounded mt-3" onClick={() => setShowLast((v) => !v)}>
-            {showLast ? "Hide Last Workout" : "Show Last Workout"}
-          </button>
-
-          {showLast && (
-            sessions.length === 0 ? (
-              <p className="text-center text-[var(--muted)] font-label text-xs py-4">No sessions logged for this lift yet.</p>
-            ) : (
-              <div className="mt-3">
-                <div className="flex items-center justify-between !gap-3 mb-2">
-                  <span className="font-label text-[11px] text-[var(--muted)]">Session</span>
-                  <select
-                    value={session?.id}
-                    onChange={(e) => setSessionId(Number(e.target.value))}
-                    className="!w-auto max-w-[160px] !py-1 !px-2 !text-[11px] normal-case tracking-normal"
-                  >
-                    {sessions.map((s) => (
-                      <option key={s.id} value={s.id}>{formatDate(s.date, true)}</option>
-                    ))}
-                  </select>
-                </div>
-                <SessionSetsChart groups={sessionGroups} primaryLabel={session ? formatDate(session.date, true) : "This session"} />
+          {view === "trend" ? (
+            <LiftProgressChart series={new Map([[record.exerciseName, points]])} selected={[record.exerciseName]} />
+          ) : sessions.length === 0 ? (
+            <p className="text-center text-[var(--muted)] font-label text-xs py-4">No sessions logged for this lift yet.</p>
+          ) : (
+            <>
+              <div className="flex items-center justify-between !gap-3 mb-2">
+                <span className="font-label text-[11px] text-[var(--muted)]">Session</span>
+                <select
+                  value={session?.id}
+                  onChange={(e) => setSessionId(Number(e.target.value))}
+                  className="!w-auto max-w-[160px] !py-1 !px-2 !text-[11px] normal-case tracking-normal"
+                >
+                  {sessions.map((s) => (
+                    <option key={s.id} value={s.id}>{formatDate(s.date, true)}</option>
+                  ))}
+                </select>
               </div>
-            )
+              <SessionSetsChart groups={sessionGroups} primaryLabel={session ? formatDate(session.date, true) : "This session"} />
+            </>
           )}
         </div>
       )}
