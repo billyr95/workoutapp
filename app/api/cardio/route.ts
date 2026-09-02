@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { auth } from "@/auth";
 
@@ -59,6 +59,12 @@ export async function POST(req: Request) {
       calories: calories ?? null,
     })
     .returning();
+
+  // A logged cardio session also changes what today's AI insight/review would say — same
+  // cache-clear as strength workout logging, see app/api/workouts/route.ts.
+  const today = new Date().toISOString().slice(0, 10);
+  await db.delete(schema.dailyInsights).where(and(eq(schema.dailyInsights.userId, userId), eq(schema.dailyInsights.date, today)));
+  await db.delete(schema.aiReviews).where(and(eq(schema.aiReviews.userId, userId), eq(schema.aiReviews.date, today)));
 
   return NextResponse.json(row);
 }

@@ -46,6 +46,10 @@ export default function TodayPage() {
   const [loadedForWorkoutId, setLoadedForWorkoutId] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [cardioForm, setCardioForm] = useState({ type: "", durationMinutes: "", distance: "", averageHeartRate: "", calories: "" });
+  // Bumped after a workout/cardio save so <TodayInsight> re-fetches — the API just invalidated
+  // today's cached insight, so this pulls in the fresh, workout-aware one instead of the stale
+  // one already sitting in that component's state from page load.
+  const [insightRefreshKey, setInsightRefreshKey] = useState(0);
 
   const flash = (msg: string) => {
     setToast(msg);
@@ -138,6 +142,7 @@ export default function TodayPage() {
     setSkipped({});
     clearDraft(workout.id, todayStr());
     await refetch();
+    setInsightRefreshKey((k) => k + 1);
     flash(json.newPRs?.length ? `Saved — new PR: ${json.newPRs.map((p: any) => p.exercise).join(", ")}` : "Workout saved");
   }
 
@@ -159,12 +164,13 @@ export default function TodayPage() {
     });
     setCardioForm({ type: "", durationMinutes: "", distance: "", averageHeartRate: "", calories: "" });
     await refetch();
+    setInsightRefreshKey((k) => k + 1);
     flash("Cardio logged");
   }
 
   return (
     <div>
-      <TodayInsight />
+      <TodayInsight key={insightRefreshKey} />
 
       <div className="section-label mb-3">Session</div>
       <select
@@ -260,6 +266,8 @@ type InsightState =
 
 // If the user has an active coach, their most recent note replaces the AI-generated
 // insight entirely — a real coach's take beats a generated one whenever one exists.
+// The parent remounts this (via `key`) after a workout/cardio save to re-fetch the
+// now-invalidated insight, instead of setState-in-effect on a changed prop.
 function TodayInsight() {
   const [state, setState] = useState<InsightState>({ status: "loading" });
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { auth } from "@/auth";
 
@@ -86,6 +86,13 @@ export async function POST(req: Request) {
       newPRs.push({ exercise: exercise.name, weight: topSet.weight, reps: topSet.reps });
     }
   }
+
+  // A logged workout changes what today's AI insight/review would say — clear today's cached
+  // copies so the next fetch regenerates from fresh data instead of showing a stale take from
+  // earlier in the day (they otherwise only regenerate once per calendar day).
+  const today = new Date().toISOString().slice(0, 10);
+  await db.delete(schema.dailyInsights).where(and(eq(schema.dailyInsights.userId, userId), eq(schema.dailyInsights.date, today)));
+  await db.delete(schema.aiReviews).where(and(eq(schema.aiReviews.userId, userId), eq(schema.aiReviews.date, today)));
 
   return NextResponse.json({ ok: true, workoutLogId, newPRs });
 }
