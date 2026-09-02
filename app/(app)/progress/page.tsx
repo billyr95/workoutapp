@@ -175,7 +175,13 @@ export default function ProgressPage() {
         <div className="card text-center text-[var(--muted)] font-label text-xs">No PRs logged yet.</div>
       ) : (
         data.personalRecords.map((p) => (
-          <PersonalRecordRow key={p.id} record={p} points={liftSeries.get(p.exerciseName) ?? []} />
+          <PersonalRecordRow
+            key={p.id}
+            record={p}
+            points={liftSeries.get(p.exerciseName) ?? []}
+            workouts={data.workouts}
+            workoutLogs={data.workoutLogs}
+          />
         ))
       )}
 
@@ -317,16 +323,41 @@ function WorkoutDetail({ workout, logs, liftSeries }: { workout: Workout; logs: 
   );
 }
 
-// Click a PR row to expand its own trend chart in place, scoped to just that lift.
+// Every past session that logged this exercise (by name, across whichever workout it lived in),
+// newest first, with just that exercise's own sets.
+function buildExerciseSessions(workouts: Workout[], workoutLogs: WorkoutLog[], exerciseName: string) {
+  const exerciseIds = new Set(workouts.flatMap((w) => w.exercises.filter((e) => e.name === exerciseName).map((e) => e.id)));
+  return workoutLogs
+    .map((log) => ({
+      id: log.id,
+      date: log.date,
+      sets: log.sets.filter((s) => exerciseIds.has(s.exerciseId)).sort((a, b) => a.setNumber - b.setNumber),
+    }))
+    .filter((s) => s.sets.length > 0)
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+// Click a PR row to expand its own trend chart in place, scoped to just that lift, with a
+// "Show Last Workout" drill-down into any past session's set-by-set weight + reps.
 function PersonalRecordRow({
   record,
   points,
+  workouts,
+  workoutLogs,
 }: {
   record: { id: number; exerciseName: string; weight: number; reps: number; date: string };
   points: LiftPoint[];
+  workouts: Workout[];
+  workoutLogs: WorkoutLog[];
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [showLast, setShowLast] = useState(false);
+  const [sessionId, setSessionId] = useState<number | null>(null);
   const chartable = points.length > 0;
+
+  const sessions = buildExerciseSessions(workouts, workoutLogs, record.exerciseName);
+  const session = sessions.find((s) => s.id === sessionId) ?? sessions[0] ?? null;
+  const sessionGroups: SessionSetGroup[] = session ? [{ name: record.exerciseName, sets: session.sets }] : [];
 
   return (
     <div className="card !py-3 !px-4 mb-2">
@@ -344,6 +375,32 @@ function PersonalRecordRow({
       {expanded && chartable && (
         <div className="mt-3">
           <LiftProgressChart series={new Map([[record.exerciseName, points]])} selected={[record.exerciseName]} />
+
+          <button type="button" className="btn-ghost w-full rounded mt-3" onClick={() => setShowLast((v) => !v)}>
+            {showLast ? "Hide Last Workout" : "Show Last Workout"}
+          </button>
+
+          {showLast && (
+            sessions.length === 0 ? (
+              <p className="text-center text-[var(--muted)] font-label text-xs py-4">No sessions logged for this lift yet.</p>
+            ) : (
+              <div className="mt-3">
+                <div className="flex items-center justify-between !gap-3 mb-2">
+                  <span className="font-label text-[11px] text-[var(--muted)]">Session</span>
+                  <select
+                    value={session?.id}
+                    onChange={(e) => setSessionId(Number(e.target.value))}
+                    className="!w-auto max-w-[160px] !py-1 !px-2 !text-[11px] normal-case tracking-normal"
+                  >
+                    {sessions.map((s) => (
+                      <option key={s.id} value={s.id}>{formatDate(s.date, true)}</option>
+                    ))}
+                  </select>
+                </div>
+                <SessionSetsChart groups={sessionGroups} primaryLabel={session ? formatDate(session.date, true) : "This session"} />
+              </div>
+            )
+          )}
         </div>
       )}
     </div>
