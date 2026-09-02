@@ -165,7 +165,14 @@ export default function ProgressPage() {
             })}
           </div>
           {effectiveWorkout && (
-            <WorkoutDetail key={effectiveWorkout.id} workout={effectiveWorkout} logs={logsByWorkoutId.get(effectiveWorkout.id) ?? []} liftSeries={liftSeries} />
+            <WorkoutDetail
+              key={effectiveWorkout.id}
+              workout={effectiveWorkout}
+              logs={logsByWorkoutId.get(effectiveWorkout.id) ?? []}
+              liftSeries={liftSeries}
+              allWorkouts={data.workouts}
+              logsByWorkoutId={logsByWorkoutId}
+            />
           )}
         </>
       )}
@@ -246,11 +253,26 @@ function ChartViewTabs({ view, onChange }: { view: ChartView; onChange: (v: Char
 
 // Keyed by workout id from the parent so switching workouts remounts this with fresh state,
 // instead of stale range/session selections leaking across workouts.
-function WorkoutDetail({ workout, logs, liftSeries }: { workout: Workout; logs: WorkoutLog[]; liftSeries: Map<string, LiftPoint[]> }) {
+function WorkoutDetail({
+  workout,
+  logs,
+  liftSeries,
+  allWorkouts,
+  logsByWorkoutId,
+}: {
+  workout: Workout;
+  logs: WorkoutLog[];
+  liftSeries: Map<string, LiftPoint[]>;
+  allWorkouts: Workout[];
+  logsByWorkoutId: Map<number, WorkoutLog[]>;
+}) {
   const [view, setView] = useState<ChartView>("trend");
   const [range, setRange] = useState(DEFAULT_WORKOUT_RANGE);
   const [sessionId, setSessionId] = useState<number | null>(() => logs[0]?.id ?? null);
   const [comparing, setComparing] = useState(false);
+  // null = compare within this same workout; otherwise the id of a different workout to pull
+  // the compare session from, so two different workouts can be laid on the same chart.
+  const [compareWorkoutId, setCompareWorkoutId] = useState<number | null>(null);
   const [compareSessionId, setCompareSessionId] = useState<number | null>(null);
 
   const rangeStart = rangeStartDate(range);
@@ -264,9 +286,15 @@ function WorkoutDetail({ workout, logs, liftSeries }: { workout: Workout; logs: 
 
   const session = logs.find((l) => l.id === sessionId) ?? logs[0] ?? null;
   const sessionGroups = session ? buildSessionGroups(workout, session) : [];
-  const otherLogs = logs.filter((l) => l.id !== session?.id);
+
+  const effectiveCompareWorkoutId = compareWorkoutId ?? workout.id;
+  const compareWorkout = allWorkouts.find((w) => w.id === effectiveCompareWorkoutId) ?? workout;
+  const compareWorkoutLogs = logsByWorkoutId.get(effectiveCompareWorkoutId) ?? [];
+  const otherLogs = effectiveCompareWorkoutId === workout.id ? compareWorkoutLogs.filter((l) => l.id !== session?.id) : compareWorkoutLogs;
+  const canCompare = logs.length > 1 || allWorkouts.some((w) => w.id !== workout.id && logsByWorkoutId.has(w.id));
   const compareSession = comparing ? (otherLogs.find((l) => l.id === compareSessionId) ?? otherLogs[0] ?? null) : null;
-  const compareGroups = compareSession ? buildSessionGroups(workout, compareSession) : undefined;
+  const compareGroups = compareSession ? buildSessionGroups(compareWorkout, compareSession) : undefined;
+  const compareOptionWorkouts = allWorkouts.filter((w) => logsByWorkoutId.has(w.id));
 
   return (
     <div>
@@ -306,7 +334,7 @@ function WorkoutDetail({ workout, logs, liftSeries }: { workout: Workout; logs: 
                   <option key={l.id} value={l.id}>{formatDate(l.date, true)}</option>
                 ))}
               </select>
-              {otherLogs.length > 0 && (
+              {canCompare && (
                 <button
                   type="button"
                   className="btn-ghost !py-1 !px-2.5 !text-[11px] normal-case tracking-normal rounded shrink-0"
@@ -317,26 +345,45 @@ function WorkoutDetail({ workout, logs, liftSeries }: { workout: Workout; logs: 
               )}
             </div>
           </div>
-          {comparing && otherLogs.length > 0 && (
-            <div className="flex items-center justify-between !gap-3 mb-2">
-              <span className="font-label text-[11px] text-[var(--muted)]">Compare to</span>
-              <select
-                value={compareSession?.id}
-                onChange={(e) => setCompareSessionId(Number(e.target.value))}
-                className="!w-auto max-w-[160px] !py-1 !px-2 !text-[11px] normal-case tracking-normal"
-              >
-                {otherLogs.map((l) => (
-                  <option key={l.id} value={l.id}>{formatDate(l.date, true)}</option>
-                ))}
-              </select>
-            </div>
+          {comparing && (
+            <>
+              <div className="flex items-center justify-between !gap-3 mb-2">
+                <span className="font-label text-[11px] text-[var(--muted)]">Compare workout</span>
+                <select
+                  value={effectiveCompareWorkoutId}
+                  onChange={(e) => {
+                    setCompareWorkoutId(Number(e.target.value));
+                    setCompareSessionId(null);
+                  }}
+                  className="!w-auto max-w-[160px] !py-1 !px-2 !text-[11px] normal-case tracking-normal"
+                >
+                  {compareOptionWorkouts.map((w) => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+              </div>
+              {otherLogs.length > 0 && (
+                <div className="flex items-center justify-between !gap-3 mb-2">
+                  <span className="font-label text-[11px] text-[var(--muted)]">Compare to</span>
+                  <select
+                    value={compareSession?.id}
+                    onChange={(e) => setCompareSessionId(Number(e.target.value))}
+                    className="!w-auto max-w-[160px] !py-1 !px-2 !text-[11px] normal-case tracking-normal"
+                  >
+                    {otherLogs.map((l) => (
+                      <option key={l.id} value={l.id}>{formatDate(l.date, true)}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </>
           )}
           <div className="card">
             <SessionSetsChart
               groups={sessionGroups}
               compareGroups={compareGroups}
-              primaryLabel={session ? formatDate(session.date, true) : "This session"}
-              compareLabel={compareSession ? formatDate(compareSession.date, true) : "Compare"}
+              primaryLabel={session ? `${workout.name} · ${formatDate(session.date, true)}` : "This session"}
+              compareLabel={compareSession ? `${compareWorkout.name} · ${formatDate(compareSession.date, true)}` : "Compare"}
             />
           </div>
         </>
@@ -360,7 +407,7 @@ function buildExerciseSessions(workouts: Workout[], workoutLogs: WorkoutLog[], e
 }
 
 // Click a PR row to expand its own trend chart in place, scoped to just that lift, with a
-// "Show Last Workout" drill-down into any past session's set-by-set weight + reps.
+// "Show Last Workout" drill-down into any past session's set-by-set reps.
 function PersonalRecordRow({
   record,
   points,

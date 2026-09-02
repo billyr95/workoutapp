@@ -217,12 +217,12 @@ export function WeightChart({ weights, hasHistory }: { weights: { date: string; 
 
 export type SessionSetGroup = { name: string; sets: { setNumber: number; weight: number; reps: number }[] };
 
-type SetDatum = { x: number; yWeight: number; yReps: number; weight: number; reps: number };
+type SetDatum = { x: number; y: number; reps: number };
 type SetLine = { name: string; color: string; pts: SetDatum[] };
 
-// Every set from one logged session, grouped by exercise and connected as a line per exercise —
-// weight on the left axis (filled circles), reps on the right axis (hollow squares) — with an
-// optional second session overlaid (dashed strokes) so two sessions can be compared set-for-set.
+// Every set from one logged session, grouped by exercise and connected as a reps-per-set line —
+// with an optional second session overlaid (dashed, hollow points) so two sessions can be
+// compared set-for-set.
 export function SessionSetsChart({
   groups,
   compareGroups,
@@ -238,17 +238,25 @@ export function SessionSetsChart({
   const [pinned, setPinned] = useState(false);
   const gradientPrefix = useId();
 
+  // Compare groups usually share exercise names with the primary (same workout, different
+  // session) and line up slot-for-slot. Comparing a different workout entirely means some
+  // compare exercises won't have a primary match — those get a stub empty primary group so
+  // they still render as their own compare-only line, appended after the matched ones.
   const compareByName = new Map((compareGroups ?? []).map((g) => [g.name, g]));
-  const visibleGroups = groups
-    .map((primary) => ({ primary, compare: compareByName.get(primary.name) ?? null }))
-    .filter(({ primary, compare }) => primary.sets.length > 0 || (compare?.sets.length ?? 0) > 0);
+  const primaryNames = new Set(groups.map((g) => g.name));
+  const visibleGroups = [
+    ...groups.map((primary) => ({ primary, compare: compareByName.get(primary.name) ?? null })),
+    ...(compareGroups ?? [])
+      .filter((g) => !primaryNames.has(g.name))
+      .map((compare) => ({ primary: { name: compare.name, sets: [] as SessionSetGroup["sets"] }, compare })),
+  ].filter(({ primary, compare }) => primary.sets.length > 0 || (compare?.sets.length ?? 0) > 0);
 
   const allSets = visibleGroups.flatMap(({ primary, compare }) => [...primary.sets, ...(compare?.sets ?? [])]);
   if (allSets.length === 0) {
     return <div className="text-center text-[var(--muted)] font-label text-xs py-6">No sets logged for this session.</div>;
   }
 
-  const h = 240, padTop = 16, padBottom = 32, padLeft = 32, padRight = 30;
+  const h = 240, padTop = 16, padBottom = 32, padLeft = 32, padRight = 16;
   const minSlotW = 30, minGroupGap = 28;
   const targetWidth = 500;
 
@@ -268,13 +276,10 @@ export function SessionSetsChart({
   const compareLines: SetLine[] = [];
   const groupLabels: { x: number; text: string }[] = [];
 
-  const maxW = Math.max(...allSets.map((s) => s.weight)) * 1.1 || 1;
-  const midW = maxW / 2;
   const maxReps = Math.max(...allSets.map((s) => s.reps)) * 1.15 || 1;
   const midReps = maxReps / 2;
   const plotBottom = h - padBottom;
-  const yFor = (weight: number) => plotBottom - (weight / maxW) * (h - padTop - padBottom);
-  const yForReps = (reps: number) => plotBottom - (reps / maxReps) * (h - padTop - padBottom);
+  const yFor = (reps: number) => plotBottom - (reps / maxReps) * (h - padTop - padBottom);
 
   let x = padLeft;
   visibleGroups.forEach(({ primary, compare }, gi) => {
@@ -282,11 +287,9 @@ export function SessionSetsChart({
     const color = colorForLift(primary.name);
     const slotCount = slotCounts[gi];
     const startX = x;
-    const toDatum = (s: { setNumber: number; weight: number; reps: number }): SetDatum => ({
+    const toDatum = (s: { setNumber: number; reps: number }): SetDatum => ({
       x: startX + (s.setNumber - 1) * slotW,
-      yWeight: yFor(s.weight),
-      yReps: yForReps(s.reps),
-      weight: s.weight,
+      y: yFor(s.reps),
       reps: s.reps,
     });
     if (primary.sets.length > 0) primaryLines.push({ name: primary.name, color, pts: primary.sets.map(toDatum) });
@@ -298,79 +301,53 @@ export function SessionSetsChart({
   const contentWidth = x + padRight;
   const w = Math.max(targetWidth, contentWidth);
 
-  function show(pt: SetDatum, name: string, setNumber: number, isCompare: boolean, atReps: boolean) {
+  function show(pt: SetDatum, name: string, setNumber: number, isCompare: boolean) {
     const label = isCompare ? compareLabel : primaryLabel;
-    setHover({ x: pt.x, y: atReps ? pt.yReps : pt.yWeight, title: `${pt.weight}lb × ${pt.reps}`, subtitle: `${name} · Set ${setNumber} · ${label}` });
+    setHover({ x: pt.x, y: pt.y, title: `${pt.reps} reps`, subtitle: `${name} · Set ${setNumber} · ${label}` });
   }
   function hide() {
     if (!pinned) setHover(null);
   }
-  function togglePin(pt: SetDatum, name: string, setNumber: number, isCompare: boolean, atReps: boolean) {
+  function togglePin(pt: SetDatum, name: string, setNumber: number, isCompare: boolean) {
     const label = isCompare ? compareLabel : primaryLabel;
-    const title = `${pt.weight}lb × ${pt.reps}`;
+    const title = `${pt.reps} reps`;
     const subtitle = `${name} · Set ${setNumber} · ${label}`;
     setPinned((wasPinned) => {
       if (wasPinned && hover?.title === title && hover?.subtitle === subtitle) {
         setHover(null);
         return false;
       }
-      setHover({ x: pt.x, y: atReps ? pt.yReps : pt.yWeight, title, subtitle });
+      setHover({ x: pt.x, y: pt.y, title, subtitle });
       return true;
     });
   }
 
-  function hitTarget(pt: SetDatum, y: number, line: SetLine, i: number, isCompare: boolean, atReps: boolean) {
-    return (
-      <circle
-        cx={pt.x}
-        cy={y}
-        r={10}
-        fill="transparent"
-        className="cursor-pointer"
-        tabIndex={0}
-        role="button"
-        aria-label={`${line.name} set ${i + 1}: ${pt.weight} pounds by ${pt.reps} reps${isCompare ? ` (${compareLabel})` : ""}`}
-        onMouseEnter={(e) => { e.stopPropagation(); show(pt, line.name, i + 1, isCompare, atReps); }}
-        onMouseLeave={hide}
-        onFocus={(e) => { e.stopPropagation(); show(pt, line.name, i + 1, isCompare, atReps); }}
-        onBlur={hide}
-        onClick={(e) => { e.stopPropagation(); togglePin(pt, line.name, i + 1, isCompare, atReps); }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); togglePin(pt, line.name, i + 1, isCompare, atReps); }
-        }}
-      />
-    );
-  }
-
-  function renderWeightPoints(line: SetLine, isCompare: boolean) {
+  function renderPoints(line: SetLine, isCompare: boolean) {
     return line.pts.map((pt, i) => (
       <g key={i}>
         {isCompare ? (
-          <circle cx={pt.x} cy={pt.yWeight} r={4} fill="var(--surface)" stroke={line.color} strokeWidth={2} />
+          <circle cx={pt.x} cy={pt.y} r={4} fill="var(--surface)" stroke={line.color} strokeWidth={2} />
         ) : (
-          <circle cx={pt.x} cy={pt.yWeight} r={4} fill={line.color} stroke="var(--surface)" strokeWidth={2} />
+          <circle cx={pt.x} cy={pt.y} r={4} fill={line.color} stroke="var(--surface)" strokeWidth={2} />
         )}
-        {hitTarget(pt, pt.yWeight, line, i, isCompare, false)}
-      </g>
-    ));
-  }
-
-  function renderRepsPoints(line: SetLine, isCompare: boolean) {
-    const s = 5.5;
-    return line.pts.map((pt, i) => (
-      <g key={i}>
-        <rect
-          x={pt.x - s / 2}
-          y={pt.yReps - s / 2}
-          width={s}
-          height={s}
-          transform={`rotate(45 ${pt.x} ${pt.yReps})`}
-          fill={isCompare ? "var(--surface)" : line.color}
-          stroke={line.color}
-          strokeWidth={1.5}
-          opacity={isCompare ? 0.7 : 0.85}
+        <circle
+          cx={pt.x}
+          cy={pt.y}
+          r={10}
+          fill="transparent"
+          className="cursor-pointer"
+          tabIndex={0}
+          role="button"
+          aria-label={`${line.name} set ${i + 1}: ${pt.reps} reps${isCompare ? ` (${compareLabel})` : ""}`}
+          onMouseEnter={(e) => { e.stopPropagation(); show(pt, line.name, i + 1, isCompare); }}
+          onMouseLeave={hide}
+          onFocus={(e) => { e.stopPropagation(); show(pt, line.name, i + 1, isCompare); }}
+          onBlur={hide}
+          onClick={(e) => { e.stopPropagation(); togglePin(pt, line.name, i + 1, isCompare); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); togglePin(pt, line.name, i + 1, isCompare); }
+          }}
         />
-        {hitTarget(pt, pt.yReps, line, i, isCompare, true)}
       </g>
     ));
   }
@@ -394,41 +371,28 @@ export function SessionSetsChart({
                 </linearGradient>
               ))}
             </defs>
-            {[0, midW, maxW].map((v, i) => (
-              <line key={i} x1={padLeft} y1={yFor(v)} x2={w - padRight} y2={yFor(v)} stroke="var(--line)" strokeWidth={1} />
-            ))}
-            {[0, midW, maxW].map((v, i) => (
-              <text key={i} x={padLeft} y={yFor(v) - 4} fill="var(--muted)" fontFamily="Manrope" fontSize={10}>{Math.round(v)}lb</text>
-            ))}
             {[0, midReps, maxReps].map((v, i) => (
-              <text key={i} x={w - padRight} y={yForReps(v) - 4} textAnchor="end" fill="var(--muted)" fontFamily="Manrope" fontSize={10}>{Math.round(v)}</text>
+              <g key={i}>
+                <line x1={padLeft} y1={yFor(v)} x2={w - padRight} y2={yFor(v)} stroke="var(--line)" strokeWidth={1} />
+                <text x={padLeft} y={yFor(v) - 4} fill="var(--muted)" fontFamily="Manrope" fontSize={10}>{Math.round(v)} reps</text>
+              </g>
             ))}
             {compareLines.map((line) => {
-              const weightPath = smoothPath(line.pts.map((p) => [p.x, p.yWeight] as const));
-              const repsPath = smoothPath(line.pts.map((p) => [p.x, p.yReps] as const));
-              return (
-                <g key={line.name}>
-                  <path d={weightPath} fill="none" stroke={line.color} strokeWidth={2} strokeDasharray="4 3" strokeLinecap="round" opacity={0.55} />
-                  <path d={repsPath} fill="none" stroke={line.color} strokeWidth={1.5} strokeDasharray="2 3" strokeLinecap="round" opacity={0.45} />
-                </g>
-              );
+              const path = smoothPath(line.pts.map((p) => [p.x, p.y] as const));
+              return <path key={line.name} d={path} fill="none" stroke={line.color} strokeWidth={2} strokeDasharray="4 3" strokeLinecap="round" opacity={0.55} />;
             })}
             {primaryLines.map((line, i) => {
-              const weightPath = smoothPath(line.pts.map((p) => [p.x, p.yWeight] as const));
-              const repsPath = smoothPath(line.pts.map((p) => [p.x, p.yReps] as const));
-              const areaPath = line.pts.length > 1 ? `${weightPath} L ${line.pts[line.pts.length - 1].x} ${plotBottom} L ${line.pts[0].x} ${plotBottom} Z` : "";
+              const path = smoothPath(line.pts.map((p) => [p.x, p.y] as const));
+              const areaPath = line.pts.length > 1 ? `${path} L ${line.pts[line.pts.length - 1].x} ${plotBottom} L ${line.pts[0].x} ${plotBottom} Z` : "";
               return (
                 <g key={line.name}>
                   {line.pts.length > 1 && <path d={areaPath} fill={`url(#${gradientPrefix}-${i})`} stroke="none" />}
-                  <path d={weightPath} fill="none" stroke={line.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />
-                  <path d={repsPath} fill="none" stroke={line.color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" opacity={0.6} />
+                  <path d={path} fill="none" stroke={line.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />
                 </g>
               );
             })}
-            {compareLines.map((line, i) => <g key={`cr-${i}`}>{renderRepsPoints(line, true)}</g>)}
-            {primaryLines.map((line, i) => <g key={`pr-${i}`}>{renderRepsPoints(line, false)}</g>)}
-            {compareLines.map((line, i) => <g key={`cw-${i}`}>{renderWeightPoints(line, true)}</g>)}
-            {primaryLines.map((line, i) => <g key={`pw-${i}`}>{renderWeightPoints(line, false)}</g>)}
+            {compareLines.map((line, i) => <g key={`c-${i}`}>{renderPoints(line, true)}</g>)}
+            {primaryLines.map((line, i) => <g key={`p-${i}`}>{renderPoints(line, false)}</g>)}
             {groupLabels.map((l, i) => (
               <text key={i} x={l.x} y={h - padBottom + 16} textAnchor="middle" fill="var(--muted)" fontFamily="Manrope" fontSize={9}>{l.text}</text>
             ))}
@@ -436,16 +400,12 @@ export function SessionSetsChart({
         </div>
       </div>
       {hover && <ChartTooltip x={hover.x} y={hover.y} w={w} h={h} title={hover.title} subtitle={hover.subtitle} />}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 font-label text-[10px] text-[var(--muted)]">
-        <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-[var(--chalk-dim)]" /> Weight (lb)</span>
-        <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rotate-45 border border-[var(--chalk-dim)]" /> Reps</span>
-        {compareLines.length > 0 && (
-          <>
-            <span className="flex items-center gap-1.5"><span className="inline-block w-3 border-t-2 border-[var(--chalk-dim)]" /> {primaryLabel}</span>
-            <span className="flex items-center gap-1.5"><span className="inline-block w-3 border-t-2 border-dashed border-[var(--muted)]" /> {compareLabel}</span>
-          </>
-        )}
-      </div>
+      {compareLines.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 font-label text-[10px] text-[var(--muted)]">
+          <span className="flex items-center gap-1.5"><span className="inline-block w-3 border-t-2 border-[var(--chalk-dim)]" /> {primaryLabel}</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block w-3 border-t-2 border-dashed border-[var(--muted)]" /> {compareLabel}</span>
+        </div>
+      )}
     </div>
   );
 }
