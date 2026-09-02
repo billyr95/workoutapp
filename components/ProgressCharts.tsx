@@ -217,112 +217,181 @@ export function WeightChart({ weights, hasHistory }: { weights: { date: string; 
 
 export type SessionSetGroup = { name: string; sets: { setNumber: number; weight: number; reps: number }[] };
 
-// Every set from one logged session, grouped by exercise and rendered as bars — set-by-set
-// shape within a workout (warm-ups vs. working sets) instead of a trend across sessions.
-export function SessionSetsChart({ groups }: { groups: SessionSetGroup[] }) {
-  const [hover, setHover] = useState<Hover | null>(null);
-  const [pinned, setPinned] = useState(false);
+type SetPoint = { x: number; y: number; weight: number; reps: number };
+type SetLine = { name: string; color: string; pts: SetPoint[] };
 
-  const allSets = groups.flatMap((g) => g.sets);
-  if (allSets.length === 0) {
+// Every set from one logged session, grouped by exercise and connected as a line per exercise —
+// set-by-set shape within a workout (warm-ups vs. working sets), with an optional second session
+// overlaid (dashed, hollow points) so two sessions of the same workout can be compared set-for-set.
+export function SessionSetsChart({
+  groups,
+  compareGroups,
+  primaryLabel = "This session",
+  compareLabel = "Compare",
+}: {
+  groups: SessionSetGroup[];
+  compareGroups?: SessionSetGroup[];
+  primaryLabel?: string;
+  compareLabel?: string;
+}) {
+  const [hover, setHover] = useState<(Hover & { compare?: boolean }) | null>(null);
+  const [pinned, setPinned] = useState(false);
+  const gradientPrefix = useId();
+
+  const compareByName = new Map((compareGroups ?? []).map((g) => [g.name, g]));
+  const visibleGroups = groups
+    .map((primary) => ({ primary, compare: compareByName.get(primary.name) ?? null }))
+    .filter(({ primary, compare }) => primary.sets.length > 0 || (compare?.sets.length ?? 0) > 0);
+
+  const allWeights = visibleGroups.flatMap(({ primary, compare }) => [...primary.sets, ...(compare?.sets ?? [])].map((s) => s.weight));
+  if (allWeights.length === 0) {
     return <div className="text-center text-[var(--muted)] font-label text-xs py-6">No sets logged for this session.</div>;
   }
 
   const h = 196, padTop = 16, padBottom = 32, padLeft = 32, padRight = 16;
-  const barW = 22, barGap = 8, groupGap = 22, barPitch = barW + barGap;
+  const slotW = 30, groupGap = 28;
 
-  type Bar = { x: number; weight: number; reps: number; color: string; exerciseName: string; setNumber: number };
-  const bars: Bar[] = [];
+  const primaryLines: SetLine[] = [];
+  const compareLines: SetLine[] = [];
   const groupLabels: { x: number; text: string }[] = [];
-  let x = padLeft;
-  groups.forEach((g, gi) => {
-    if (gi > 0) x += groupGap;
-    const color = colorForLift(g.name);
-    const startX = x;
-    g.sets.forEach((s, si) => {
-      if (si > 0) x += barPitch;
-      bars.push({ x, weight: s.weight, reps: s.reps, color, exerciseName: g.name, setNumber: s.setNumber });
-    });
-    groupLabels.push({ x: (startX + x + barW) / 2, text: g.name });
-    x += barW;
-  });
-  const contentWidth = x + padRight;
-  const w = Math.max(500, contentWidth);
 
-  const maxW = Math.max(...allSets.map((s) => s.weight)) * 1.1 || 1;
+  const maxW = Math.max(...allWeights) * 1.1 || 1;
   const midW = maxW / 2;
   const plotBottom = h - padBottom;
   const yFor = (weight: number) => plotBottom - (weight / maxW) * (h - padTop - padBottom);
 
-  function show(bar: Bar, y: number) {
-    setHover({ x: bar.x + barW / 2, y, title: `${bar.weight}lb × ${bar.reps}`, subtitle: `${bar.exerciseName} · Set ${bar.setNumber}` });
+  let x = padLeft;
+  visibleGroups.forEach(({ primary, compare }, gi) => {
+    if (gi > 0) x += groupGap;
+    const color = colorForLift(primary.name);
+    const slotCount = Math.max(primary.sets.length, compare?.sets.length ?? 0, 1);
+    const startX = x;
+    if (primary.sets.length > 0) {
+      primaryLines.push({
+        name: primary.name,
+        color,
+        pts: primary.sets.map((s) => ({ x: startX + (s.setNumber - 1) * slotW, y: yFor(s.weight), weight: s.weight, reps: s.reps })),
+      });
+    }
+    if (compare && compare.sets.length > 0) {
+      compareLines.push({
+        name: compare.name,
+        color,
+        pts: compare.sets.map((s) => ({ x: startX + (s.setNumber - 1) * slotW, y: yFor(s.weight), weight: s.weight, reps: s.reps })),
+      });
+    }
+    const endX = startX + (slotCount - 1) * slotW;
+    groupLabels.push({ x: (startX + endX) / 2, text: primary.name });
+    x = endX;
+  });
+  const contentWidth = x + padRight;
+  const w = Math.max(500, contentWidth);
+
+  function show(pt: SetPoint, name: string, setNumber: number, isCompare: boolean) {
+    const label = isCompare ? compareLabel : primaryLabel;
+    setHover({ x: pt.x, y: pt.y, title: `${pt.weight}lb × ${pt.reps}`, subtitle: `${name} · Set ${setNumber} · ${label}`, compare: isCompare });
   }
   function hide() {
     if (!pinned) setHover(null);
   }
-  function togglePin(bar: Bar, y: number) {
-    const title = `${bar.weight}lb × ${bar.reps}`;
-    const subtitle = `${bar.exerciseName} · Set ${bar.setNumber}`;
+  function togglePin(pt: SetPoint, name: string, setNumber: number, isCompare: boolean) {
+    const label = isCompare ? compareLabel : primaryLabel;
+    const title = `${pt.weight}lb × ${pt.reps}`;
+    const subtitle = `${name} · Set ${setNumber} · ${label}`;
     setPinned((wasPinned) => {
       if (wasPinned && hover?.title === title && hover?.subtitle === subtitle) {
         setHover(null);
         return false;
       }
-      setHover({ x: bar.x + barW / 2, y, title, subtitle });
+      setHover({ x: pt.x, y: pt.y, title, subtitle, compare: isCompare });
       return true;
     });
   }
 
-  return (
-    <div className="relative overflow-x-auto">
-      <div style={{ width: w }}>
-        <svg
-          viewBox={`0 0 ${w} ${h}`}
-          className="w-full h-auto"
-          onClick={() => {
-            if (pinned) { setPinned(false); setHover(null); }
+  function renderPoints(line: SetLine, lineIndex: number, isCompare: boolean) {
+    return line.pts.map((pt, i) => (
+      <g key={i}>
+        {isCompare ? (
+          <circle cx={pt.x} cy={pt.y} r={4} fill="var(--surface)" stroke={line.color} strokeWidth={2} />
+        ) : (
+          <circle cx={pt.x} cy={pt.y} r={4} fill={line.color} stroke="var(--surface)" strokeWidth={2} />
+        )}
+        <circle
+          cx={pt.x}
+          cy={pt.y}
+          r={10}
+          fill="transparent"
+          className="cursor-pointer"
+          tabIndex={0}
+          role="button"
+          aria-label={`${line.name} set ${i + 1}: ${pt.weight} pounds by ${pt.reps} reps${isCompare ? ` (${compareLabel})` : ""}`}
+          onMouseEnter={(e) => { e.stopPropagation(); show(pt, line.name, i + 1, isCompare); }}
+          onMouseLeave={hide}
+          onFocus={(e) => { e.stopPropagation(); show(pt, line.name, i + 1, isCompare); }}
+          onBlur={hide}
+          onClick={(e) => { e.stopPropagation(); togglePin(pt, line.name, i + 1, isCompare); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); togglePin(pt, line.name, i + 1, isCompare); }
           }}
-        >
-          {[0, midW, maxW].map((v, i) => (
-            <g key={i}>
-              <line x1={padLeft} y1={yFor(v)} x2={w - padRight} y2={yFor(v)} stroke="var(--line)" strokeWidth={1} />
-              <text x={padLeft} y={yFor(v) - 4} fill="var(--muted)" fontFamily="Manrope" fontSize={10}>{Math.round(v)}lb</text>
-            </g>
-          ))}
-          {bars.map((bar, i) => {
-            const y = yFor(bar.weight);
-            return (
+        />
+      </g>
+    ));
+  }
+
+  return (
+    <div className="relative">
+      <div className="overflow-x-auto">
+        <div style={{ width: w }}>
+          <svg
+            viewBox={`0 0 ${w} ${h}`}
+            className="w-full h-auto"
+            onClick={() => {
+              if (pinned) { setPinned(false); setHover(null); }
+            }}
+          >
+            <defs>
+              {primaryLines.map((line, i) => (
+                <linearGradient key={line.name} id={`${gradientPrefix}-${i}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={line.color} stopOpacity={0.18} />
+                  <stop offset="100%" stopColor={line.color} stopOpacity={0} />
+                </linearGradient>
+              ))}
+            </defs>
+            {[0, midW, maxW].map((v, i) => (
               <g key={i}>
-                <rect x={bar.x} y={y} width={barW} height={Math.max(0, plotBottom - y)} rx={3} fill={bar.color} opacity={0.85} />
-                <text x={bar.x + barW / 2} y={y - 5} textAnchor="middle" fill="var(--chalk-dim)" fontFamily="Manrope" fontSize={9}>{bar.weight}</text>
-                <rect
-                  x={bar.x}
-                  y={padTop}
-                  width={barW}
-                  height={plotBottom - padTop}
-                  fill="transparent"
-                  className="cursor-pointer"
-                  tabIndex={0}
-                  role="button"
-                  aria-label={`${bar.exerciseName} set ${bar.setNumber}: ${bar.weight} pounds by ${bar.reps} reps`}
-                  onMouseEnter={(e) => { e.stopPropagation(); show(bar, y); }}
-                  onMouseLeave={hide}
-                  onFocus={(e) => { e.stopPropagation(); show(bar, y); }}
-                  onBlur={hide}
-                  onClick={(e) => { e.stopPropagation(); togglePin(bar, y); }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); togglePin(bar, y); }
-                  }}
-                />
+                <line x1={padLeft} y1={yFor(v)} x2={w - padRight} y2={yFor(v)} stroke="var(--line)" strokeWidth={1} />
+                <text x={padLeft} y={yFor(v) - 4} fill="var(--muted)" fontFamily="Manrope" fontSize={10}>{Math.round(v)}lb</text>
               </g>
-            );
-          })}
-          {groupLabels.map((l, i) => (
-            <text key={i} x={l.x} y={h - padBottom + 16} textAnchor="middle" fill="var(--muted)" fontFamily="Manrope" fontSize={9}>{l.text}</text>
-          ))}
-        </svg>
+            ))}
+            {compareLines.map((line) => {
+              const path = smoothPath(line.pts.map((p) => [p.x, p.y] as const));
+              return <path key={line.name} d={path} fill="none" stroke={line.color} strokeWidth={2} strokeDasharray="4 3" strokeLinecap="round" opacity={0.55} />;
+            })}
+            {primaryLines.map((line, i) => {
+              const path = smoothPath(line.pts.map((p) => [p.x, p.y] as const));
+              const areaPath = line.pts.length > 1 ? `${path} L ${line.pts[line.pts.length - 1].x} ${plotBottom} L ${line.pts[0].x} ${plotBottom} Z` : "";
+              return (
+                <g key={line.name}>
+                  {line.pts.length > 1 && <path d={areaPath} fill={`url(#${gradientPrefix}-${i})`} stroke="none" />}
+                  <path d={path} fill="none" stroke={line.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />
+                </g>
+              );
+            })}
+            {compareLines.map((line, i) => <g key={i}>{renderPoints(line, i, true)}</g>)}
+            {primaryLines.map((line, i) => <g key={i}>{renderPoints(line, i, false)}</g>)}
+            {groupLabels.map((l, i) => (
+              <text key={i} x={l.x} y={h - padBottom + 16} textAnchor="middle" fill="var(--muted)" fontFamily="Manrope" fontSize={9}>{l.text}</text>
+            ))}
+          </svg>
+        </div>
       </div>
       {hover && <ChartTooltip x={hover.x} y={hover.y} w={w} h={h} title={hover.title} subtitle={hover.subtitle} />}
+      {compareLines.length > 0 && (
+        <div className="flex items-center gap-3 mt-2 font-label text-[10px] text-[var(--muted)]">
+          <span className="flex items-center gap-1.5"><span className="inline-block w-3 border-t-2 border-[var(--chalk-dim)]" /> {primaryLabel}</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block w-3 border-t-2 border-dashed border-[var(--muted)]" /> {compareLabel}</span>
+        </div>
+      )}
     </div>
   );
 }

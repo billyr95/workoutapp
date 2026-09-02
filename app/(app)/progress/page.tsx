@@ -175,12 +175,7 @@ export default function ProgressPage() {
         <div className="card text-center text-[var(--muted)] font-label text-xs">No PRs logged yet.</div>
       ) : (
         data.personalRecords.map((p) => (
-          <div key={p.id} className="card !py-3 !px-4 flex justify-between items-center mb-2">
-            <span className="font-label text-[13px]">{p.exerciseName}</span>
-            <span className="font-label text-[11px] uppercase tracking-wide text-[var(--olive)]">
-              {p.weight}lb × {p.reps} — {p.date}
-            </span>
-          </div>
+          <PersonalRecordRow key={p.id} record={p} points={liftSeries.get(p.exerciseName) ?? []} />
         ))
       )}
 
@@ -211,14 +206,14 @@ export default function ProgressPage() {
 }
 
 // Every set from one logged session, grouped by exercise in the workout's own exercise order.
+// Empty groups are left in (not filtered here) so a compare session's chart still lines up
+// exercise-for-exercise with the primary session even if one of them skipped an exercise.
 function buildSessionGroups(workout: Workout, session: WorkoutLog): SessionSetGroup[] {
   const exercisesInOrder = [...workout.exercises].sort((a, b) => a.sortOrder - b.sortOrder);
-  return exercisesInOrder
-    .map((ex) => ({
-      name: ex.name,
-      sets: session.sets.filter((s) => s.exerciseId === ex.id).sort((a, b) => a.setNumber - b.setNumber),
-    }))
-    .filter((g) => g.sets.length > 0);
+  return exercisesInOrder.map((ex) => ({
+    name: ex.name,
+    sets: session.sets.filter((s) => s.exerciseId === ex.id).sort((a, b) => a.setNumber - b.setNumber),
+  }));
 }
 
 // Keyed by workout id from the parent so switching workouts remounts this with fresh state,
@@ -227,6 +222,8 @@ function WorkoutDetail({ workout, logs, liftSeries }: { workout: Workout; logs: 
   const [range, setRange] = useState(DEFAULT_WORKOUT_RANGE);
   const [showLast, setShowLast] = useState(false);
   const [sessionId, setSessionId] = useState<number | null>(() => logs[0]?.id ?? null);
+  const [comparing, setComparing] = useState(false);
+  const [compareSessionId, setCompareSessionId] = useState<number | null>(null);
 
   const rangeStart = rangeStartDate(range);
   const exerciseNames = workout.exercises.map((e) => e.name).slice(0, MAX_SELECTED_LIFTS);
@@ -239,6 +236,9 @@ function WorkoutDetail({ workout, logs, liftSeries }: { workout: Workout; logs: 
 
   const session = logs.find((l) => l.id === sessionId) ?? logs[0] ?? null;
   const sessionGroups = session ? buildSessionGroups(workout, session) : [];
+  const otherLogs = logs.filter((l) => l.id !== session?.id);
+  const compareSession = comparing ? (otherLogs.find((l) => l.id === compareSessionId) ?? otherLogs[0] ?? null) : null;
+  const compareGroups = compareSession ? buildSessionGroups(workout, compareSession) : undefined;
 
   return (
     <div>
@@ -269,19 +269,82 @@ function WorkoutDetail({ workout, logs, liftSeries }: { workout: Workout; logs: 
           <div className="card">
             <div className="flex items-center justify-between !gap-3 mb-2">
               <span className="font-label text-[11px] text-[var(--muted)]">Session</span>
-              <select
-                value={session?.id}
-                onChange={(e) => setSessionId(Number(e.target.value))}
-                className="!w-auto max-w-[160px] !py-1 !px-2 !text-[11px] normal-case tracking-normal"
-              >
-                {logs.map((l) => (
-                  <option key={l.id} value={l.id}>{formatDate(l.date, true)}</option>
-                ))}
-              </select>
+              <div className="flex items-center gap-2">
+                <select
+                  value={session?.id}
+                  onChange={(e) => setSessionId(Number(e.target.value))}
+                  className="!w-auto max-w-[160px] !py-1 !px-2 !text-[11px] normal-case tracking-normal"
+                >
+                  {logs.map((l) => (
+                    <option key={l.id} value={l.id}>{formatDate(l.date, true)}</option>
+                  ))}
+                </select>
+                {otherLogs.length > 0 && (
+                  <button
+                    type="button"
+                    className="btn-ghost !py-1 !px-2.5 !text-[11px] normal-case tracking-normal rounded shrink-0"
+                    onClick={() => setComparing((v) => !v)}
+                  >
+                    {comparing ? "Hide Compare" : "Compare"}
+                  </button>
+                )}
+              </div>
             </div>
-            <SessionSetsChart groups={sessionGroups} />
+            {comparing && otherLogs.length > 0 && (
+              <div className="flex items-center justify-between !gap-3 mb-2">
+                <span className="font-label text-[11px] text-[var(--muted)]">Compare to</span>
+                <select
+                  value={compareSession?.id}
+                  onChange={(e) => setCompareSessionId(Number(e.target.value))}
+                  className="!w-auto max-w-[160px] !py-1 !px-2 !text-[11px] normal-case tracking-normal"
+                >
+                  {otherLogs.map((l) => (
+                    <option key={l.id} value={l.id}>{formatDate(l.date, true)}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <SessionSetsChart
+              groups={sessionGroups}
+              compareGroups={compareGroups}
+              primaryLabel={session ? formatDate(session.date, true) : "This session"}
+              compareLabel={compareSession ? formatDate(compareSession.date, true) : "Compare"}
+            />
           </div>
         )
+      )}
+    </div>
+  );
+}
+
+// Click a PR row to expand its own trend chart in place, scoped to just that lift.
+function PersonalRecordRow({
+  record,
+  points,
+}: {
+  record: { id: number; exerciseName: string; weight: number; reps: number; date: string };
+  points: LiftPoint[];
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const chartable = points.length > 0;
+
+  return (
+    <div className="card !py-3 !px-4 mb-2">
+      <button
+        type="button"
+        disabled={!chartable}
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex justify-between items-center text-left disabled:cursor-default"
+      >
+        <span className="font-label text-[13px]">{record.exerciseName}</span>
+        <span className="font-label text-[11px] uppercase tracking-wide text-[var(--olive)]">
+          {record.weight}lb × {record.reps} — {record.date}
+        </span>
+      </button>
+      {expanded && chartable && (
+        <div className="mt-3">
+          <LiftProgressChart series={new Map([[record.exerciseName, points]])} selected={[record.exerciseName]} />
+        </div>
       )}
     </div>
   );
