@@ -11,7 +11,7 @@ const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
 type DayType = "Rest" | "Cardio" | "Workout";
 type DayForm = { type: DayType; name: string; category: "Strength" | "Hypertrophy" };
 
-type Exercise = { id: number; name: string; sets: number; repMin: number; repMax: number };
+type Exercise = { id: number; name: string; sets: number; repMin: number; repMax: number; sortOrder: number };
 type Workout = { id: number; name: string; exercises: Exercise[] };
 type ScheduleDay = { day: string; workoutType: string; category: string | null };
 type SavedProgram = { id: number; name: string; createdAt: string };

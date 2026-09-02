@@ -125,6 +125,12 @@ export default function ProfilePage() {
         </Link>
       )}
 
+      {session?.user?.isAdmin && (
+        <Link href="/admin/invites" className="block card mb-4 text-center hover:border-[var(--chalk-dim)]">
+          <span className="font-label text-xs text-[var(--chalk)]">Coach Invite Codes →</span>
+        </Link>
+      )}
+
       <CoachSection />
 
       <div className="section-label mb-3">Appearance</div>

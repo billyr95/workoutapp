@@ -3,9 +3,9 @@
 import { useId, useState } from "react";
 
 export type LiftPoint = { date: string; weight: number };
-type Exercise = { id: number; name: string };
+type Exercise = { id: number; name: string; sortOrder: number };
 type Workout = { id: number; exercises: Exercise[] };
-type SetLog = { exerciseId: number; weight: number };
+type SetLog = { exerciseId: number; setNumber: number; weight: number; reps: number };
 type WorkoutLog = { date: string; sets: SetLog[] };
 
 // One point per workout log per exercise: the heaviest set logged that session.
@@ -31,6 +31,28 @@ export function buildLiftSeries(workouts: Workout[], workoutLogs: WorkoutLog[]):
   return series;
 }
 
+// Every set from one logged session, grouped by exercise in the workout's own exercise order.
+// Empty groups are left in (not filtered here) so a compare session's chart still lines up
+// exercise-for-exercise with the primary session even if one of them skipped an exercise.
+export function buildSessionGroups(workout: Workout, session: WorkoutLog): SessionSetGroup[] {
+  const exercisesInOrder = [...workout.exercises].sort((a, b) => a.sortOrder - b.sortOrder);
+  return exercisesInOrder.map((ex) => ({
+    name: ex.name,
+    sets: session.sets.filter((s) => s.exerciseId === ex.id).sort((a, b) => a.setNumber - b.setNumber),
+  }));
+}
+
+// ISO date (YYYY-MM-DD) marking the start of a range like "30" (days), "ytd", or "all" — null
+// for "all" (no lower bound). Shared by every range dropdown across the progress charts.
+export function rangeStartDate(range: string): string | null {
+  if (range === "all") return null;
+  const now = new Date();
+  if (range === "ytd") return `${now.getFullYear()}-01-01`;
+  const d = new Date(now);
+  d.setDate(d.getDate() - Number(range));
+  return d.toISOString().slice(0, 10);
+}
+
 const SERIES_COLORS = [
   "var(--series-1)",
   "var(--series-2)",
@@ -43,14 +65,40 @@ const SERIES_COLORS = [
 ];
 export const MAX_SELECTED_LIFTS = SERIES_COLORS.length;
 
-// Stable per-entity color: same lift always gets the same slot, independent of what else is selected.
-export function colorForLift(name: string) {
+function hashSlot(name: string) {
   let hash = 2166136261;
   for (let i = 0; i < name.length; i++) {
     hash ^= name.charCodeAt(i);
     hash = Math.imul(hash, 16777619);
   }
-  return SERIES_COLORS[Math.abs(hash) % SERIES_COLORS.length];
+  return Math.abs(hash) % SERIES_COLORS.length;
+}
+
+// Stable per-entity color: same lift always gets the same slot, independent of what else is selected.
+// Two unrelated lifts can still hash to the same slot — fine on their own, but a visible collision
+// when they land on the same chart. Use this directly only where a lift's color is looked up in
+// isolation (nothing else being compared against it); anywhere multiple lifts render together,
+// use assignLiftColors instead so the batch gets de-collided.
+export function colorForLift(name: string) {
+  return SERIES_COLORS[hashSlot(name)];
+}
+
+// Same hash-based preference as colorForLift, but resolves same-chart collisions: if two names in
+// this batch would land on the same slot, the one that sorts later steps to the next open slot
+// instead of rendering identically to another line on the same chart. Resolution order is by name
+// (not input order), so the same set of names always resolves to the same colors regardless of
+// which order the caller happens to list them in.
+export function assignLiftColors(names: string[]): Map<string, string> {
+  const unique = [...new Set(names)].sort((a, b) => a.localeCompare(b));
+  const taken = new Set<number>();
+  const result = new Map<string, string>();
+  for (const name of unique) {
+    let slot = hashSlot(name);
+    while (taken.has(slot)) slot = (slot + 1) % SERIES_COLORS.length;
+    taken.add(slot);
+    result.set(name, SERIES_COLORS[slot]);
+  }
+  return result;
 }
 
 export function formatDate(iso: string, withYear = false) {
@@ -275,6 +323,7 @@ export function SessionSetsChart({
   const primaryLines: SetLine[] = [];
   const compareLines: SetLine[] = [];
   const groupLabels: { x: number; text: string }[] = [];
+  const colors = assignLiftColors(visibleGroups.map(({ primary }) => primary.name));
 
   const maxReps = Math.max(...allSets.map((s) => s.reps)) * 1.15 || 1;
   const midReps = maxReps / 2;
@@ -284,7 +333,7 @@ export function SessionSetsChart({
   let x = padLeft;
   visibleGroups.forEach(({ primary, compare }, gi) => {
     if (gi > 0) x += groupGap;
-    const color = colorForLift(primary.name);
+    const color = colors.get(primary.name)!;
     const slotCount = slotCounts[gi];
     const startX = x;
     const toDatum = (s: { setNumber: number; reps: number }): SetDatum => ({
@@ -427,6 +476,7 @@ export function LiftProgressChart({ series, selected }: { series: Map<string, Li
     );
   }
 
+  const colors = assignLiftColors(active.map((s) => s.name));
   const w = 500, h = 240, pad = 24, padRight = pad + 34;
   const allPoints = active.flatMap((s) => s.points);
   const dates = allPoints.map((p) => new Date(p.date).getTime());
@@ -492,7 +542,7 @@ export function LiftProgressChart({ series, selected }: { series: Map<string, Li
       >
         <defs>
           {active.map((s, i) => {
-            const color = colorForLift(s.name);
+            const color = colors.get(s.name)!;
             return (
               <linearGradient key={s.name} id={`${gradientPrefix}-${i}`} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={color} stopOpacity={0.18} />
@@ -505,7 +555,7 @@ export function LiftProgressChart({ series, selected }: { series: Map<string, Li
           <line key={i} x1={pad} y1={yFor(v)} x2={w - pad} y2={yFor(v)} stroke="var(--line)" strokeWidth={1} />
         ))}
         {active.map((s, seriesIndex) => {
-          const color = colorForLift(s.name);
+          const color = colors.get(s.name)!;
           const pts = s.points.map((p) => [xFor(p.date), yFor(p.weight)] as const);
           const path = smoothPath(pts);
           const areaPath = pts.length > 1 ? `${path} L ${pts[pts.length - 1][0]} ${h - pad} L ${pts[0][0]} ${h - pad} Z` : "";
@@ -562,7 +612,7 @@ export function LiftProgressChart({ series, selected }: { series: Map<string, Li
       <div className="flex flex-wrap gap-x-3 gap-y-1.5 mt-2">
         {active.map((s) => (
           <div key={s.name} className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ background: colorForLift(s.name) }} />
+            <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ background: colors.get(s.name)! }} />
             <span className="font-label text-[11px] text-[var(--chalk-dim)]">{s.name}</span>
           </div>
         ))}

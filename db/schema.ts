@@ -26,6 +26,8 @@ export const users = pgTable("users", {
   activeProgramId: integer("active_program_id"),
   // gates access to /coaching — set only at registration, via a valid coach invite code
   isCoach: boolean("is_coach").notNull().default(false),
+  // gates access to /admin — minted manually (see scripts run by the app owner), no self-serve path
+  isAdmin: boolean("is_admin").notNull().default(false),
 });
 
 export const follows = pgTable("follows", {
@@ -172,7 +174,7 @@ export const dailyInsights = pgTable("daily_insights", {
   createdAt: text("created_at").notNull(),
 });
 
-// Single-use codes that grant isCoach on registration — minted out-of-band (no self-serve UI yet).
+// Single-use codes that grant isCoach on registration — minted from /admin/invites by an admin.
 export const coachInviteCodes = pgTable("coach_invite_codes", {
   id: serial("id").primaryKey(),
   code: text("code").notNull().unique(),

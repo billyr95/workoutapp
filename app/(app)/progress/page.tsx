@@ -1,9 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAppData, Workout, WorkoutLog } from "@/lib/useAppData";
 import LoadingMark from "@/components/LoadingMark";
-import { LiftPoint, SessionSetGroup, buildLiftSeries, MAX_SELECTED_LIFTS, WeightChart, LiftProgressChart, SessionSetsChart, formatDate } from "@/components/ProgressCharts";
+import {
+  LiftPoint,
+  SessionSetGroup,
+  buildLiftSeries,
+  buildSessionGroups,
+  rangeStartDate,
+  MAX_SELECTED_LIFTS,
+  WeightChart,
+  LiftProgressChart,
+  SessionSetsChart,
+  formatDate,
+} from "@/components/ProgressCharts";
 
 const RANGE_OPTIONS = [
   { value: "14", label: "14 Days" },
@@ -26,16 +37,6 @@ const WORKOUT_RANGE_OPTIONS = [
   { value: "all", label: "All Time" },
 ];
 const DEFAULT_WORKOUT_RANGE = "30";
-
-// ISO date (YYYY-MM-DD) marking the start of the selected range, or null for "All Time".
-function rangeStartDate(range: string): string | null {
-  if (range === "all") return null;
-  const now = new Date();
-  if (range === "ytd") return `${now.getFullYear()}-01-01`;
-  const d = new Date(now);
-  d.setDate(d.getDate() - Number(range));
-  return d.toISOString().slice(0, 10);
-}
 
 export default function ProgressPage() {
   const { data, loading, refetch } = useAppData();
@@ -218,17 +219,6 @@ export default function ProgressPage() {
   );
 }
 
-// Every set from one logged session, grouped by exercise in the workout's own exercise order.
-// Empty groups are left in (not filtered here) so a compare session's chart still lines up
-// exercise-for-exercise with the primary session even if one of them skipped an exercise.
-function buildSessionGroups(workout: Workout, session: WorkoutLog): SessionSetGroup[] {
-  const exercisesInOrder = [...workout.exercises].sort((a, b) => a.sortOrder - b.sortOrder);
-  return exercisesInOrder.map((ex) => ({
-    name: ex.name,
-    sets: session.sets.filter((s) => s.exerciseId === ex.id).sort((a, b) => a.setNumber - b.setNumber),
-  }));
-}
-
 type ChartView = "trend" | "last";
 
 // Trend vs. Last Workout switch between two mutually-exclusive full-width views instead of
@@ -251,6 +241,48 @@ function ChartViewTabs({ view, onChange }: { view: ChartView; onChange: (v: Char
   );
 }
 
+// Picks one item from a list by id, falling back to the first (most recent) entry until the
+// user actively picks a different one. Shared by every "past session" dropdown on this page.
+function useSelectedFromList<T extends { id: number }>(list: T[]): [T | null, (id: number | null) => void] {
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const selected = list.find((item) => item.id === selectedId) ?? list[0] ?? null;
+  return [selected, setSelectedId];
+}
+
+// The label + date-dropdown row used to pick a past session, with room for trailing controls
+// (e.g. a Compare toggle) passed as children.
+function SessionPickerRow({
+  label,
+  sessions,
+  selectedId,
+  onChange,
+  children,
+}: {
+  label: string;
+  sessions: { id: number; date: string }[];
+  selectedId: number | undefined;
+  onChange: (id: number) => void;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between !gap-3 mb-2">
+      <span className="font-label text-[11px] text-[var(--muted)]">{label}</span>
+      <div className="flex items-center gap-2">
+        <select
+          value={selectedId}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="!w-auto max-w-[160px] !py-1 !px-2 !text-[11px] normal-case tracking-normal"
+        >
+          {sessions.map((s) => (
+            <option key={s.id} value={s.id}>{formatDate(s.date, true)}</option>
+          ))}
+        </select>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 // Keyed by workout id from the parent so switching workouts remounts this with fresh state,
 // instead of stale range/session selections leaking across workouts.
 function WorkoutDetail({
@@ -268,12 +300,11 @@ function WorkoutDetail({
 }) {
   const [view, setView] = useState<ChartView>("trend");
   const [range, setRange] = useState(DEFAULT_WORKOUT_RANGE);
-  const [sessionId, setSessionId] = useState<number | null>(() => logs[0]?.id ?? null);
+  const [session, setSessionId] = useSelectedFromList(logs);
   const [comparing, setComparing] = useState(false);
   // null = compare within this same workout; otherwise the id of a different workout to pull
   // the compare session from, so two different workouts can be laid on the same chart.
   const [compareWorkoutId, setCompareWorkoutId] = useState<number | null>(null);
-  const [compareSessionId, setCompareSessionId] = useState<number | null>(null);
 
   const rangeStart = rangeStartDate(range);
   const exerciseNames = workout.exercises.map((e) => e.name).slice(0, MAX_SELECTED_LIFTS);
@@ -284,7 +315,6 @@ function WorkoutDetail({
     if (filtered.length) filteredSeries.set(name, filtered);
   }
 
-  const session = logs.find((l) => l.id === sessionId) ?? logs[0] ?? null;
   const sessionGroups = session ? buildSessionGroups(workout, session) : [];
 
   const effectiveCompareWorkoutId = compareWorkoutId ?? workout.id;
@@ -292,7 +322,8 @@ function WorkoutDetail({
   const compareWorkoutLogs = logsByWorkoutId.get(effectiveCompareWorkoutId) ?? [];
   const otherLogs = effectiveCompareWorkoutId === workout.id ? compareWorkoutLogs.filter((l) => l.id !== session?.id) : compareWorkoutLogs;
   const canCompare = logs.length > 1 || allWorkouts.some((w) => w.id !== workout.id && logsByWorkoutId.has(w.id));
-  const compareSession = comparing ? (otherLogs.find((l) => l.id === compareSessionId) ?? otherLogs[0] ?? null) : null;
+  const [compareSessionRaw, setCompareSessionId] = useSelectedFromList(otherLogs);
+  const compareSession = comparing ? compareSessionRaw : null;
   const compareGroups = compareSession ? buildSessionGroups(compareWorkout, compareSession) : undefined;
   const compareOptionWorkouts = allWorkouts.filter((w) => logsByWorkoutId.has(w.id));
 
@@ -322,29 +353,17 @@ function WorkoutDetail({
         <div className="card text-center text-[var(--muted)] font-label text-xs">No sessions logged for this workout yet.</div>
       ) : (
         <>
-          <div className="flex items-center justify-between !gap-3 mb-2">
-            <span className="font-label text-[11px] text-[var(--muted)]">Session</span>
-            <div className="flex items-center gap-2">
-              <select
-                value={session?.id}
-                onChange={(e) => setSessionId(Number(e.target.value))}
-                className="!w-auto max-w-[160px] !py-1 !px-2 !text-[11px] normal-case tracking-normal"
+          <SessionPickerRow label="Session" sessions={logs} selectedId={session?.id} onChange={setSessionId}>
+            {canCompare && (
+              <button
+                type="button"
+                className="btn-ghost !py-1 !px-2.5 !text-[11px] normal-case tracking-normal rounded shrink-0"
+                onClick={() => setComparing((v) => !v)}
               >
-                {logs.map((l) => (
-                  <option key={l.id} value={l.id}>{formatDate(l.date, true)}</option>
-                ))}
-              </select>
-              {canCompare && (
-                <button
-                  type="button"
-                  className="btn-ghost !py-1 !px-2.5 !text-[11px] normal-case tracking-normal rounded shrink-0"
-                  onClick={() => setComparing((v) => !v)}
-                >
-                  {comparing ? "Hide Compare" : "Compare"}
-                </button>
-              )}
-            </div>
-          </div>
+                {comparing ? "Hide Compare" : "Compare"}
+              </button>
+            )}
+          </SessionPickerRow>
           {comparing && (
             <>
               <div className="flex items-center justify-between !gap-3 mb-2">
@@ -363,18 +382,7 @@ function WorkoutDetail({
                 </select>
               </div>
               {otherLogs.length > 0 && (
-                <div className="flex items-center justify-between !gap-3 mb-2">
-                  <span className="font-label text-[11px] text-[var(--muted)]">Compare to</span>
-                  <select
-                    value={compareSession?.id}
-                    onChange={(e) => setCompareSessionId(Number(e.target.value))}
-                    className="!w-auto max-w-[160px] !py-1 !px-2 !text-[11px] normal-case tracking-normal"
-                  >
-                    {otherLogs.map((l) => (
-                      <option key={l.id} value={l.id}>{formatDate(l.date, true)}</option>
-                    ))}
-                  </select>
-                </div>
+                <SessionPickerRow label="Compare to" sessions={otherLogs} selectedId={compareSession?.id} onChange={setCompareSessionId} />
               )}
             </>
           )}
@@ -421,11 +429,10 @@ function PersonalRecordRow({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [view, setView] = useState<ChartView>("trend");
-  const [sessionId, setSessionId] = useState<number | null>(null);
   const chartable = points.length > 0;
 
   const sessions = buildExerciseSessions(workouts, workoutLogs, record.exerciseName);
-  const session = sessions.find((s) => s.id === sessionId) ?? sessions[0] ?? null;
+  const [session, setSessionId] = useSelectedFromList(sessions);
   const sessionGroups: SessionSetGroup[] = session ? [{ name: record.exerciseName, sets: session.sets }] : [];
 
   return (
@@ -451,18 +458,7 @@ function PersonalRecordRow({
             <p className="text-center text-[var(--muted)] font-label text-xs py-4">No sessions logged for this lift yet.</p>
           ) : (
             <>
-              <div className="flex items-center justify-between !gap-3 mb-2">
-                <span className="font-label text-[11px] text-[var(--muted)]">Session</span>
-                <select
-                  value={session?.id}
-                  onChange={(e) => setSessionId(Number(e.target.value))}
-                  className="!w-auto max-w-[160px] !py-1 !px-2 !text-[11px] normal-case tracking-normal"
-                >
-                  {sessions.map((s) => (
-                    <option key={s.id} value={s.id}>{formatDate(s.date, true)}</option>
-                  ))}
-                </select>
-              </div>
+              <SessionPickerRow label="Session" sessions={sessions} selectedId={session?.id} onChange={setSessionId} />
               <SessionSetsChart groups={sessionGroups} primaryLabel={session ? formatDate(session.date, true) : "This session"} />
             </>
           )}

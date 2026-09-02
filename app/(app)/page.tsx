@@ -116,7 +116,7 @@ export default function TodayPage() {
 
   async function saveWorkout() {
     if (!workout) return;
-    const sets: any[] = [];
+    const sets: { exerciseId: number; setNumber: number; weight: number; reps: number }[] = [];
     workout.exercises.forEach((ex) => {
       if (skipped[ex.id]) return;
       // Sets the user never touched still count if they match last week's autofilled numbers.
@@ -137,13 +137,13 @@ export default function TodayPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ workoutId: workout.id, date: todayStr(), sets }),
     });
-    const json = await res.json();
+    const json: { newPRs: { exercise: string; weight: number; reps: number }[] } = await res.json();
     setDraft({});
     setSkipped({});
     clearDraft(workout.id, todayStr());
     await refetch();
     setInsightRefreshKey((k) => k + 1);
-    flash(json.newPRs?.length ? `Saved — new PR: ${json.newPRs.map((p: any) => p.exercise).join(", ")}` : "Workout saved");
+    flash(json.newPRs?.length ? `Saved — new PR: ${json.newPRs.map((p) => p.exercise).join(", ")}` : "Workout saved");
   }
 
   async function saveCardio() {

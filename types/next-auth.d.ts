@@ -6,6 +6,7 @@ declare module "next-auth" {
       id: string;
       username: string | null;
       isCoach: boolean;
+      isAdmin: boolean;
     } & DefaultSession["user"];
   }
 }
@@ -15,5 +16,6 @@ declare module "next-auth/jwt" {
     userId?: string;
     username?: string | null;
     isCoach?: boolean;
+    isAdmin?: boolean;
   }
 }
