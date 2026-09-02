@@ -249,7 +249,20 @@ export function SessionSetsChart({
   }
 
   const h = 240, padTop = 16, padBottom = 32, padLeft = 32, padRight = 30;
-  const slotW = 30, groupGap = 28;
+  const minSlotW = 30, minGroupGap = 28;
+  const targetWidth = 500;
+
+  const slotCounts = visibleGroups.map(({ primary, compare }) => Math.max(primary.sets.length, compare?.sets.length ?? 0, 1));
+  const totalSlotUnits = slotCounts.reduce((sum, c) => sum + (c - 1), 0);
+  const totalGroupGaps = Math.max(0, visibleGroups.length - 1);
+  // A sparse session (few sets) would otherwise cluster in a corner of the fixed-width chart —
+  // stretch spacing to fill the full width whenever the natural layout falls short of it, and
+  // never compress below the minimum (that's what the horizontal-scroll fallback is for).
+  const naturalPlotWidth = totalSlotUnits * minSlotW + totalGroupGaps * minGroupGap;
+  const availablePlotWidth = targetWidth - padLeft - padRight;
+  const scale = naturalPlotWidth > 0 ? Math.max(1, availablePlotWidth / naturalPlotWidth) : 1;
+  const slotW = minSlotW * scale;
+  const groupGap = minGroupGap * scale;
 
   const primaryLines: SetLine[] = [];
   const compareLines: SetLine[] = [];
@@ -267,7 +280,7 @@ export function SessionSetsChart({
   visibleGroups.forEach(({ primary, compare }, gi) => {
     if (gi > 0) x += groupGap;
     const color = colorForLift(primary.name);
-    const slotCount = Math.max(primary.sets.length, compare?.sets.length ?? 0, 1);
+    const slotCount = slotCounts[gi];
     const startX = x;
     const toDatum = (s: { setNumber: number; weight: number; reps: number }): SetDatum => ({
       x: startX + (s.setNumber - 1) * slotW,
@@ -283,7 +296,7 @@ export function SessionSetsChart({
     x = endX;
   });
   const contentWidth = x + padRight;
-  const w = Math.max(500, contentWidth);
+  const w = Math.max(targetWidth, contentWidth);
 
   function show(pt: SetDatum, name: string, setNumber: number, isCompare: boolean, atReps: boolean) {
     const label = isCompare ? compareLabel : primaryLabel;
