@@ -34,6 +34,9 @@ function ScheduleContent() {
   const [form, setForm] = useState({ name: "", sets: "", repMin: "", repMax: "" });
   const [dayForm, setDayForm] = useState<DayForm>({ type: "Rest", name: "", category: "Strength" });
   const [savingDay, setSavingDay] = useState(false);
+  const [editingExerciseId, setEditingExerciseId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", sets: "", repMin: "", repMax: "" });
+  const [savingExercise, setSavingExercise] = useState(false);
 
   const [programs, setPrograms] = useState<SavedProgram[]>([]);
   const [showSaveForm, setShowSaveForm] = useState(false);
@@ -98,6 +101,30 @@ function ScheduleContent() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
     });
+    await refetch();
+  }
+
+  function startEditExercise(ex: { id: number; name: string; sets: number; repMin: number; repMax: number }) {
+    setEditingExerciseId(ex.id);
+    setEditForm({ name: ex.name, sets: String(ex.sets), repMin: String(ex.repMin), repMax: String(ex.repMax) });
+  }
+
+  async function saveExerciseEdit() {
+    if (editingExerciseId == null || !editForm.name || !editForm.sets || !editForm.repMin) return;
+    setSavingExercise(true);
+    await fetch("/api/exercises", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: editingExerciseId,
+        name: editForm.name,
+        sets: Number(editForm.sets),
+        repMin: Number(editForm.repMin),
+        repMax: Number(editForm.repMax || editForm.repMin),
+      }),
+    });
+    setSavingExercise(false);
+    setEditingExerciseId(null);
     await refetch();
   }
 
@@ -288,20 +315,50 @@ function ScheduleContent() {
                   {isConfigurableWorkout && editingWorkout ? (
                     <div className="mt-3 pt-3 border-t border-[var(--line)]">
                       <div className="font-display text-xl mb-2">{editingWorkout.name}</div>
-                      {editingWorkout.exercises.map((ex) => (
-                        <div key={ex.id} className="flex items-center gap-2 mb-1.5">
-                          <span className="font-label text-[13px] flex-[2]">{ex.name}</span>
-                          <span className="font-label text-xs text-[var(--chalk-dim)] flex-1">
-                            {ex.sets}×{ex.repMin}-{ex.repMax}
-                          </span>
-                          <span
-                            className="text-[var(--muted)] hover:text-[var(--red)] cursor-pointer font-label text-sm px-1.5"
-                            onClick={() => removeExercise(ex.id)}
-                          >
-                            ✕
-                          </span>
-                        </div>
-                      ))}
+                      {editingWorkout.exercises.map((ex) =>
+                        editingExerciseId === ex.id ? (
+                          <div key={ex.id} className="mb-2.5 p-2.5 rounded border border-[var(--line)]">
+                            <input
+                              placeholder="Exercise name"
+                              value={editForm.name}
+                              onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                              className="mb-2"
+                            />
+                            <div className="flex gap-2 mb-2">
+                              <input type="number" placeholder="Sets" value={editForm.sets} onChange={(e) => setEditForm({ ...editForm, sets: e.target.value })} />
+                              <input type="number" placeholder="Min reps" value={editForm.repMin} onChange={(e) => setEditForm({ ...editForm, repMin: e.target.value })} />
+                              <input type="number" placeholder="Max reps" value={editForm.repMax} onChange={(e) => setEditForm({ ...editForm, repMax: e.target.value })} />
+                            </div>
+                            <div className="flex gap-2">
+                              <button className="btn !py-1.5 !px-3 !text-[11px]" onClick={saveExerciseEdit} disabled={savingExercise}>
+                                {savingExercise ? "Saving…" : "Save"}
+                              </button>
+                              <button className="btn-ghost !py-1.5 !px-3 !text-[11px] rounded" onClick={() => setEditingExerciseId(null)}>
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div key={ex.id} className="flex items-center gap-2 mb-1.5">
+                            <span className="font-label text-[13px] flex-[2]">{ex.name}</span>
+                            <span className="font-label text-xs text-[var(--chalk-dim)] flex-1">
+                              {ex.sets}×{ex.repMin}-{ex.repMax}
+                            </span>
+                            <span
+                              className="font-label text-xs text-[var(--muted)] hover:text-[var(--chalk)] underline cursor-pointer shrink-0"
+                              onClick={() => startEditExercise(ex)}
+                            >
+                              Edit
+                            </span>
+                            <span
+                              className="text-[var(--muted)] hover:text-[var(--red)] cursor-pointer font-label text-sm pl-3 pr-1"
+                              onClick={() => removeExercise(ex.id)}
+                            >
+                              ✕
+                            </span>
+                          </div>
+                        )
+                      )}
                       <div className="mt-3">
                         <input placeholder="Exercise name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mb-2" />
                         <div className="flex gap-2">

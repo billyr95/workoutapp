@@ -548,6 +548,46 @@ export async function addExerciseToWorkout(
   return { ok: true, data: row, summary: `Added ${name} to ${workout.name}` };
 }
 
+export async function updateExerciseById(
+  targetUserId: number,
+  id: number,
+  input: { name: string; sets: number; repMin: number; repMax: number; restSeconds: number | null }
+): Promise<MutationResult<typeof schema.exercises.$inferSelect>> {
+  const { name, sets, repMin, repMax, restSeconds } = input;
+  if (!id || !name || !sets || !repMin || !repMax) {
+    return { ok: false, error: "Missing required fields", status: 400 };
+  }
+
+  const allExercises = await db.select().from(schema.exercises);
+  const exercise = allExercises.find((e) => e.id === id);
+  if (!exercise) return { ok: false, error: "Not found", status: 404 };
+
+  const allWorkouts = await db.select().from(schema.workouts);
+  const workout = allWorkouts.find((w) => w.id === exercise.workoutId);
+  if (!workout || workout.userId !== targetUserId) {
+    return { ok: false, error: "Not found", status: 404 };
+  }
+
+  const [row] = await db
+    .update(schema.exercises)
+    .set({ name, sets, repMin, repMax, restSeconds: restSeconds ?? null })
+    .where(eq(schema.exercises.id, id))
+    .returning();
+
+  await recordCommunityExercise(name, sets, repMin, repMax, restSeconds ?? null, targetUserId);
+  const siblingExercises = allExercises
+    .filter((e) => e.workoutId === exercise.workoutId)
+    .map((e) => (e.id === id ? row : e))
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+  await recordCommunityWorkout(
+    workout.name,
+    siblingExercises.map((e) => ({ name: e.name, sets: e.sets, repMin: e.repMin, repMax: e.repMax, restSeconds: e.restSeconds })),
+    targetUserId
+  );
+
+  return { ok: true, data: row, summary: `Updated ${name} in ${workout.name}` };
+}
+
 export async function removeExerciseById(targetUserId: number, id: number): Promise<MutationResult<null>> {
   if (!id) return { ok: false, error: "Missing id", status: 400 };
 

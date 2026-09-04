@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { addExerciseToWorkout, removeExerciseById } from "@/lib/data";
+import { addExerciseToWorkout, removeExerciseById, updateExerciseById } from "@/lib/data";
 
 // body: { workoutId, name, sets, repMin, repMax, restSeconds? }
 export async function POST(req: Request) {
@@ -10,6 +10,25 @@ export async function POST(req: Request) {
 
   const body = await req.json();
   const result = await addExerciseToWorkout(userId, body.workoutId, {
+    name: body.name,
+    sets: body.sets,
+    repMin: body.repMin,
+    repMax: body.repMax,
+    restSeconds: body.restSeconds ?? null,
+  });
+  if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+
+  return NextResponse.json(result.data);
+}
+
+// body: { id, name, sets, repMin, repMax, restSeconds? }
+export async function PATCH(req: Request) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = Number(session.user.id);
+
+  const body = await req.json();
+  const result = await updateExerciseById(userId, body.id, {
     name: body.name,
     sets: body.sets,
     repMin: body.repMin,
