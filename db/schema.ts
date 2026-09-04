@@ -133,6 +133,19 @@ export const programs = pgTable("programs", {
   createdAt: text("created_at").notNull(),
 });
 
+// Pre-made programs offered at sign-up ("start from a template" vs. "build your own"). Not
+// owned by any user — applying one copies its data into a normal `programs` row for that user
+// (via saveProgram) and then loadProgram()s it, same path as a manual build or XML import.
+export const starterPrograms = pgTable("starter_programs", {
+  id: serial("id").primaryKey(),
+  slug: text("slug").notNull().unique(),
+  name: text("name").notNull(),
+  level: text("level").notNull(),
+  daysPerWeek: integer("days_per_week").notNull(),
+  data: jsonb("data").$type<ProgramData>().notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
 // Community library: every exercise/workout name ever entered, deduplicated by
 // name, so anyone building a program can search and reuse what others typed in.
 export const communityExercises = pgTable("community_exercises", {

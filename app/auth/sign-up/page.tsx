@@ -40,7 +40,7 @@ export default function SignUpPage() {
       router.push("/auth/sign-in");
       return;
     }
-    router.push("/");
+    router.push("/onboarding");
     router.refresh();
   }
 
@@ -98,7 +98,7 @@ export default function SignUpPage() {
             <button type="submit" className="btn flex-1" disabled={loading || !agreed}>
               {loading ? "Creating account…" : "Sign Up"}
             </button>
-            <GoogleButton compact fullWidth={false} disabled={!agreed} />
+            <GoogleButton compact fullWidth={false} disabled={!agreed} callbackUrl="/onboarding" />
           </div>
         </form>
         <p className="text-center font-label text-xs text-[var(--muted)] mt-4">

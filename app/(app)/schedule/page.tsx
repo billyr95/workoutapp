@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAppData } from "@/lib/useAppData";
 import NewProgramModal from "./NewProgramModal";
 import LoadingMark from "@/components/LoadingMark";
@@ -18,7 +19,16 @@ function dayFormFor(sched: { workoutType: string; category: string | null } | un
 }
 
 export default function SchedulePage() {
+  return (
+    <Suspense fallback={null}>
+      <ScheduleContent />
+    </Suspense>
+  );
+}
+
+function ScheduleContent() {
   const { data, loading, refetch } = useAppData();
+  const searchParams = useSearchParams();
   const [editingDay, setEditingDay] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", sets: "", repMin: "", repMax: "" });
   const [dayForm, setDayForm] = useState<DayForm>({ type: "Rest", name: "", category: "Strength" });
@@ -26,7 +36,9 @@ export default function SchedulePage() {
 
   const [programs, setPrograms] = useState<SavedProgram[]>([]);
   const [showSaveForm, setShowSaveForm] = useState(false);
-  const [showNewProgramModal, setShowNewProgramModal] = useState(false);
+  // Coming from onboarding's "Build Your Own" opens this straight away instead of landing on
+  // an otherwise-empty schedule with no obvious next step.
+  const [showNewProgramModal, setShowNewProgramModal] = useState(() => searchParams.get("newProgram") === "1");
   const [programName, setProgramName] = useState("");
   const [savingProgram, setSavingProgram] = useState(false);
   // null = no explicit choice yet — default to whichever program is currently active
