@@ -1,4 +1,5 @@
-// Creates (or resets) two demo accounts for portfolio/interview walkthroughs:
+// Creates (or resets) two demo accounts for portfolio/interview walkthroughs, each backfilled
+// with a full year (DAYS_OF_HISTORY) of logged sessions:
 //   - demo_coach ("Jordan Blake"): a coach with their own populated training history AND an
 //     active client relationship to demo_client, so the coaching dashboard shows real data —
 //     history, weight trend, PRs, a flagged edit, and coach notes.
@@ -18,27 +19,60 @@ import { starterProgramSeeds } from "../db/starterProgramSeeds";
 import type { ProgramWorkout } from "../db/schema";
 
 const DEMO_PASSWORD = "RepraDemo2026!";
-const WEEKS_OF_HISTORY = 5;
+const DAYS_OF_HISTORY = 365;
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 function isoDate(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
-function baseWeightFor(name: string): number {
-  const n = name.toLowerCase();
-  if (n.includes("squat") || n.includes("deadlift")) return 135;
-  if (n.includes("bench press") && !n.includes("dumbbell") && !n.includes("machine") && !n.includes("incline")) return 115;
-  if (n.includes("overhead press") || n.includes("barbell row")) return 85;
-  if (n.includes("pull-up") || n.includes("push-up") || n.includes("dip")) return 0;
-  return 25;
+function randRange(min: number, max: number) {
+  return min + Math.random() * (max - min);
 }
 
-function weeklyIncrementFor(name: string): number {
+// Real gyms move in 2.5lb (or 5lb on barbells) increments, not arbitrary decimals.
+function roundToPlate(weight: number, step: number) {
+  return Math.max(0, Math.round(weight / step) * step);
+}
+
+type ExerciseProfile = { startWeight: number; gainRate: number; noise: number; plateStep: number };
+
+// Each exercise gets its OWN randomized starting point and pace — so "Hip Thrust" and "Leg
+// Extension" (both nominally "isolation") don't end up converging on the same number just
+// because they're in the same rough category. Generated once per exercise and reused across
+// every session so a given lift still has a consistent identity/trajectory, not pure noise.
+// gainRate scales with sqrt(weeks) — see weightForSession — so a full year lands on a plausible
+// total gain (newbie-fast early progress that tapers into a plateau) instead of linear-forever.
+function profileFor(name: string): ExerciseProfile {
   const n = name.toLowerCase();
-  if (n.includes("squat") || n.includes("deadlift") || (n.includes("bench press") && !n.includes("dumbbell")) || n.includes("overhead press") || n.includes("barbell row")) return 5;
-  if (n.includes("pull-up") || n.includes("push-up") || n.includes("dip")) return 0;
-  return 2.5;
+  if (n.includes("squat") || n.includes("deadlift")) {
+    return { startWeight: randRange(95, 145), gainRate: randRange(6, 11), noise: 8, plateStep: 5 };
+  }
+  if ((n.includes("bench press") && !n.includes("dumbbell") && !n.includes("machine") && !n.includes("incline")) || n.includes("overhead press") || n.includes("barbell row")) {
+    return { startWeight: randRange(55, 90), gainRate: randRange(3.5, 7), noise: 6, plateStep: 5 };
+  }
+  if (n.includes("pull-up") || n.includes("push-up") || n.includes("dip")) {
+    return { startWeight: randRange(0, 15), gainRate: randRange(0.5, 2.5), noise: 3, plateStep: 2.5 };
+  }
+  return { startWeight: randRange(10, 45), gainRate: randRange(2, 4.5), noise: 6, plateStep: 2.5 };
+}
+
+// Trend-plus-noise instead of a clean staircase: fast early progress that decelerates over the
+// year (sqrt curve — real newbie-gains-then-plateau shape, not a straight line to infinity),
+// plus any given session can land a little heavier or lighter than the trend, same as real logs.
+function weightForSession(profile: ExerciseProfile, weekIndex: number) {
+  const trend = profile.startWeight + profile.gainRate * Math.sqrt(weekIndex);
+  const jittered = trend + randRange(-profile.noise, profile.noise);
+  const floor = Math.max(0, profile.startWeight * 0.7);
+  return roundToPlate(Math.max(floor, jittered), profile.plateStep);
+}
+
+// Set 1 usually lands near the top of the rep range (occasionally hits it exactly, sometimes
+// a couple under), with fatigue dropping later sets by a randomized amount rather than a fixed 1.
+function repsForSet(repMin: number, repMax: number, setNumber: number) {
+  const top = repMax - Math.round(randRange(0, Math.min(2, repMax - repMin)));
+  const fatigue = (setNumber - 1) * Math.round(randRange(1, 2));
+  return Math.max(repMin, Math.min(repMax, top - fatigue));
 }
 
 async function deleteAccountIfExists(username: string) {
@@ -104,8 +138,28 @@ async function createAccount(opts: {
   return user;
 }
 
-// Applies a starter template and backfills WEEKS_OF_HISTORY of logged sessions with weight
-// that climbs a little each week, plus weekly weigh-ins trending toward the account's goal.
+// Inserts rows in chunks instead of one round-trip per row/session — a full year of daily
+// sessions is thousands of rows, and Neon's HTTP driver is latency- not throughput-bound.
+async function batchInsert<T extends Record<string, unknown>>(
+  table: Parameters<typeof db.insert>[0],
+  rows: T[],
+  batchSize: number,
+  withReturning: boolean
+) {
+  const out: Record<string, unknown>[] = [];
+  for (let i = 0; i < rows.length; i += batchSize) {
+    const chunk = rows.slice(i, i + batchSize);
+    if (withReturning) {
+      out.push(...(await db.insert(table).values(chunk).returning()));
+    } else {
+      await db.insert(table).values(chunk);
+    }
+  }
+  return out;
+}
+
+// Applies a starter template and backfills DAYS_OF_HISTORY of logged sessions with weight that
+// climbs fastest early and tapers off, plus weigh-ins trending toward the account's goal.
 async function populateTraining(userId: number, starterSlug: string, startingWeight: number, goalWeight: number) {
   const starter = starterProgramSeeds.find((s) => s.slug === starterSlug)!;
   const saved = await saveProgram(userId, starter.name, starter.data);
@@ -119,11 +173,19 @@ async function populateTraining(userId: number, starterSlug: string, startingWei
   const exerciseIdByName = new Map(exerciseRows.map((e) => [e.name, e.id]));
   const workoutByName = new Map<string, ProgramWorkout>(starter.data.workouts.map((w) => [w.name, w]));
 
-  const today = new Date();
-  const totalDays = WEEKS_OF_HISTORY * 7;
-  const loggedByExercise = new Map<string, { weight: number; reps: number; date: string }>();
-  let lastWorkoutLogId: number | null = null;
+  // One randomized trajectory per exercise, reused across every session it appears in.
+  const profileByExercise = new Map<string, ExerciseProfile>();
+  for (const w of starter.data.workouts) {
+    for (const ex of w.exercises) {
+      if (!profileByExercise.has(ex.name)) profileByExercise.set(ex.name, profileFor(ex.name));
+    }
+  }
 
+  const today = new Date();
+  const totalDays = DAYS_OF_HISTORY;
+
+  // Pass 1: figure out which days are real sessions (no DB calls yet).
+  const sessionDays: { dateStr: string; workoutId: number; workout: ProgramWorkout; weekIndex: number }[] = [];
   for (let daysAgo = totalDays; daysAgo >= 1; daysAgo--) {
     const d = new Date(today);
     d.setDate(d.getDate() - daysAgo);
@@ -135,38 +197,53 @@ async function populateTraining(userId: number, starterSlug: string, startingWei
     const workoutId = workoutIdByName.get(sched.workoutType);
     if (!workout || !workoutId) continue;
 
-    const weekIndex = Math.floor((totalDays - daysAgo) / 7); // 0 = oldest week, increases toward today
-    const dateStr = isoDate(d);
-    const [log] = await db.insert(schema.workoutLogs).values({ userId, date: dateStr, workoutId }).returning();
-    lastWorkoutLogId = log.id;
+    sessionDays.push({ dateStr: isoDate(d), workoutId, workout, weekIndex: (totalDays - daysAgo) / 7 });
+  }
 
-    const sets: { workoutLogId: number; exerciseId: number; setNumber: number; weight: number; reps: number }[] = [];
+  // Pass 2: bulk-insert one workoutLogs row per session, in order, so the returned ids line up
+  // positionally with sessionDays — safe here since nothing else writes to this table concurrently.
+  const insertedLogs = await batchInsert(
+    schema.workoutLogs,
+    sessionDays.map((s) => ({ userId, date: s.dateStr, workoutId: s.workoutId })),
+    200,
+    true
+  );
+
+  // Pass 3: build every set for every session, then bulk-insert once at the end.
+  const loggedByExercise = new Map<string, { weight: number; reps: number; date: string }>();
+  const allSets: { workoutLogId: number; exerciseId: number; setNumber: number; weight: number; reps: number }[] = [];
+  for (let i = 0; i < sessionDays.length; i++) {
+    const { workout, weekIndex, dateStr } = sessionDays[i];
+    const workoutLogId = insertedLogs[i].id as number;
     for (const ex of workout.exercises) {
       const exerciseId = exerciseIdByName.get(ex.name);
       if (!exerciseId) continue;
-      const weight = baseWeightFor(ex.name) + weekIndex * weeklyIncrementFor(ex.name);
+      const profile = profileByExercise.get(ex.name)!;
+      const weight = weightForSession(profile, weekIndex);
+      let firstSetReps = ex.repMax;
       for (let setNumber = 1; setNumber <= ex.sets; setNumber++) {
-        const reps = Math.max(ex.repMin, ex.repMax - (setNumber - 1));
-        sets.push({ workoutLogId: log.id, exerciseId, setNumber, weight, reps });
+        const reps = repsForSet(ex.repMin, ex.repMax, setNumber);
+        if (setNumber === 1) firstSetReps = reps;
+        allSets.push({ workoutLogId, exerciseId, setNumber, weight, reps });
       }
       const prev = loggedByExercise.get(ex.name);
-      // Set 1 always logs repMax reps (see the setNumber loop above) — record that, not repMin,
-      // so the PR actually matches a set that gets shown in that session's log.
-      if (!prev || weight >= prev.weight) loggedByExercise.set(ex.name, { weight, reps: ex.repMax, date: dateStr });
+      if (!prev || weight >= prev.weight) loggedByExercise.set(ex.name, { weight, reps: firstSetReps, date: dateStr });
     }
-    if (sets.length) await db.insert(schema.setLogs).values(sets);
   }
+  await batchInsert(schema.setLogs, allSets, 500, false);
 
-  // Weekly weigh-ins trending toward the goal, not quite reaching it yet.
+  // Weigh-ins every 2-3 days, wobbling around the trend line toward the goal (never quite
+  // reaching it) — real body weight fluctuates day to day, not a ruler-straight line.
   const weightLogValues = [];
-  for (let w = WEEKS_OF_HISTORY; w >= 0; w--) {
+  for (let daysAgo = totalDays; daysAgo >= 0; daysAgo -= Math.round(randRange(2, 3))) {
     const d = new Date(today);
-    d.setDate(d.getDate() - w * 7);
-    const progress = (WEEKS_OF_HISTORY - w) / (WEEKS_OF_HISTORY + 1.5); // stops short of the goal
-    const weight = Math.round((startingWeight + (goalWeight - startingWeight) * progress) * 10) / 10;
+    d.setDate(d.getDate() - daysAgo);
+    const progress = (totalDays - daysAgo) / (totalDays + 10); // stops short of the goal
+    const trend = startingWeight + (goalWeight - startingWeight) * progress;
+    const weight = Math.round((trend + randRange(-1.3, 1.3)) * 10) / 10;
     weightLogValues.push({ userId, date: isoDate(d), weight });
   }
-  await db.insert(schema.weightLogs).values(weightLogValues);
+  await batchInsert(schema.weightLogs, weightLogValues, 200, false);
 
   // PRs: the heaviest set actually logged per exercise, matching what /api/workouts' PR
   // detection would have produced if these sessions had been logged one at a time for real.
@@ -177,8 +254,9 @@ async function populateTraining(userId: number, starterSlug: string, startingWei
     reps: pr.reps,
     date: pr.date,
   }));
-  if (prValues.length) await db.insert(schema.personalRecords).values(prValues);
+  if (prValues.length) await batchInsert(schema.personalRecords, prValues, 200, false);
 
+  const lastWorkoutLogId = insertedLogs.length ? (insertedLogs[insertedLogs.length - 1].id as number) : null;
   return { lastWorkoutLogId };
 }
 
@@ -237,8 +315,8 @@ async function main() {
     coachId: coach.id,
     clientId: client.id,
     status: "active",
-    invitedAt: daysAgo(WEEKS_OF_HISTORY * 7 + 2),
-    respondedAt: daysAgo(WEEKS_OF_HISTORY * 7 + 1),
+    invitedAt: daysAgo(DAYS_OF_HISTORY + 2),
+    respondedAt: daysAgo(DAYS_OF_HISTORY + 1),
   });
 
   await db.insert(schema.programEditLog).values([

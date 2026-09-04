@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ProgramData, ProgramExercise, ProgramWorkout } from "@/db/schema";
+import StarterProgramCard, { type StarterProgram } from "@/components/StarterProgramCard";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 type DayType = "Rest" | "Cardio" | "Workout";
@@ -40,34 +41,6 @@ async function saveProgram(name: string, data: ProgramData): Promise<{ program?:
   return { program: { id: json.id, name: json.name, createdAt: json.createdAt }, errors: json.errors ?? [] };
 }
 
-// Parses an uploaded XML program file into the raw shape /api/programs validates server-side.
-// Browser DOMParser never resolves external entities/DTDs, so this is safe against XXE.
-function parseProgramXml(text: string): { name: string | null; data: { schedule: unknown[]; workouts: unknown[] } } {
-  const doc = new DOMParser().parseFromString(text, "application/xml");
-  if (doc.querySelector("parsererror")) throw new Error("That file isn't valid XML.");
-
-  const name = doc.querySelector("program")?.getAttribute("name") || null;
-
-  const schedule = Array.from(doc.querySelectorAll("schedule > day")).map((el) => {
-    const type = el.getAttribute("type");
-    const workoutType = type === "Rest" ? "Rest" : type === "Cardio" ? "Cardio" : el.getAttribute("workout") ?? "";
-    return { day: el.getAttribute("name") ?? "", workoutType, category: el.getAttribute("category") };
-  });
-
-  const workouts = Array.from(doc.querySelectorAll("workouts > workout")).map((wEl) => ({
-    name: wEl.getAttribute("name") ?? "",
-    exercises: Array.from(wEl.querySelectorAll("exercise")).map((eEl) => ({
-      name: eEl.getAttribute("name") ?? "",
-      sets: eEl.getAttribute("sets"),
-      repMin: eEl.getAttribute("repMin"),
-      repMax: eEl.getAttribute("repMax"),
-      restSeconds: eEl.getAttribute("restSeconds"),
-    })),
-  }));
-
-  return { name, data: { schedule, workouts } };
-}
-
 export default function NewProgramModal({
   onClose,
   onSaved,
@@ -77,14 +50,20 @@ export default function NewProgramModal({
   onSaved: (p: SavedProgram) => void;
   onLoaded?: () => void;
 }) {
-  const [tab, setTab] = useState<"build" | "xml" | "ai">("build");
+  const [tab, setTab] = useState<"build" | "prebuilt" | "ai">("build");
   const [name, setName] = useState("");
   const [days, setDays] = useState<Record<string, DayDraft>>(emptyDays);
   const [workouts, setWorkouts] = useState<ProgramWorkout[]>([]);
 
-  const [xmlData, setXmlData] = useState<{ schedule: unknown[]; workouts: unknown[] } | null>(null);
-  const [xmlFileName, setXmlFileName] = useState("");
-  const [xmlParseError, setXmlParseError] = useState("");
+  const [starterPrograms, setStarterPrograms] = useState<StarterProgram[] | null>(null);
+  const [usingStarterId, setUsingStarterId] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch("/api/starter-programs")
+      .then((res) => res.json())
+      .then(setStarterPrograms)
+      .catch(() => setStarterPrograms([]));
+  }, []);
 
   const [goals, setGoals] = useState("");
   const [generating, setGenerating] = useState(false);
@@ -156,26 +135,17 @@ export default function NewProgramModal({
       return;
     }
 
-    let data: ProgramData | { schedule: unknown[]; workouts: unknown[] };
-    if (tab === "build") {
-      const schedule = DAYS.map((d) => {
-        const entry = days[d];
-        if (entry.type === "Rest") return { day: d, workoutType: "Rest", category: null };
-        if (entry.type === "Cardio") return { day: d, workoutType: "Cardio", category: null };
-        return { day: d, workoutType: entry.name.trim(), category: entry.category };
-      });
-      const activeNames = new Set(schedule.map((s) => s.workoutType).filter((n) => n !== "Rest" && n !== "Cardio" && n));
-      data = { schedule, workouts: workouts.filter((w) => activeNames.has(w.name)) };
-    } else {
-      if (!xmlData) {
-        setSaveError("Choose an XML file first.");
-        return;
-      }
-      data = xmlData;
-    }
+    const schedule = DAYS.map((d) => {
+      const entry = days[d];
+      if (entry.type === "Rest") return { day: d, workoutType: "Rest", category: null };
+      if (entry.type === "Cardio") return { day: d, workoutType: "Cardio", category: null };
+      return { day: d, workoutType: entry.name.trim(), category: entry.category };
+    });
+    const activeNames = new Set(schedule.map((s) => s.workoutType).filter((n) => n !== "Rest" && n !== "Cardio" && n));
+    const data: ProgramData = { schedule, workouts: workouts.filter((w) => activeNames.has(w.name)) };
 
     setSaving(true);
-    const res = await saveProgram(name.trim(), data as ProgramData);
+    const res = await saveProgram(name.trim(), data);
     setSaving(false);
     if (!res.program) {
       setSaveError(res.error ?? "Failed to save program");
@@ -185,18 +155,15 @@ export default function NewProgramModal({
     onSaved(res.program);
   }
 
-  async function handleFile(file: File) {
-    setXmlParseError("");
-    setXmlData(null);
-    setXmlFileName(file.name);
-    try {
-      const text = await file.text();
-      const parsed = parseProgramXml(text);
-      setXmlData(parsed.data);
-      if (parsed.name && !name.trim()) setName(parsed.name);
-    } catch (err) {
-      setXmlParseError(err instanceof Error ? err.message : "Couldn't parse that file.");
-    }
+  async function handleUseStarterProgram(program: StarterProgram) {
+    setUsingStarterId(program.id);
+    const res = await fetch(`/api/starter-programs/${program.id}/apply`, { method: "POST" });
+    const json = await res.json();
+    setUsingStarterId(null);
+    if (!res.ok) return;
+    onSaved({ id: json.programId, name: program.name, createdAt: new Date().toISOString() });
+    onLoaded?.();
+    onClose();
   }
 
   return (
@@ -225,7 +192,7 @@ export default function NewProgramModal({
           </div>
         ) : (
           <>
-            {tab !== "ai" && <input placeholder="Program name" value={name} onChange={(e) => setName(e.target.value)} className="mb-3" />}
+            {tab === "build" && <input placeholder="Program name" value={name} onChange={(e) => setName(e.target.value)} className="mb-3" />}
 
             <div className="flex gap-2 mb-3.5">
               <button
@@ -235,10 +202,10 @@ export default function NewProgramModal({
                 Build from scratch
               </button>
               <button
-                className={`btn-ghost !py-1.5 !px-3 !text-[11px] rounded flex-1 ${tab === "xml" ? "!border-[var(--red)] !text-[var(--chalk)]" : ""}`}
-                onClick={() => setTab("xml")}
+                className={`btn-ghost !py-1.5 !px-3 !text-[11px] rounded flex-1 ${tab === "prebuilt" ? "!border-[var(--red)] !text-[var(--chalk)]" : ""}`}
+                onClick={() => setTab("prebuilt")}
               >
-                Upload XML
+                Prebuilt Workouts
               </button>
               <button
                 className={`btn-ghost !py-1.5 !px-3 !text-[11px] rounded flex-1 ${tab === "ai" ? "!border-[var(--red)] !text-[var(--chalk)]" : ""}`}
@@ -335,27 +302,27 @@ export default function NewProgramModal({
               </div>
             ) : (
               <div>
-                <input type="file" accept=".xml,text/xml" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} className="mb-2" />
-                {xmlFileName && !xmlParseError && xmlData && (
-                  <p className="font-label text-[11px] text-[var(--olive)] mb-3">
-                    Parsed {xmlFileName}: {xmlData.schedule.length} scheduled day{xmlData.schedule.length === 1 ? "" : "s"}, {xmlData.workouts.length} workout{xmlData.workouts.length === 1 ? "" : "s"}.
-                  </p>
+                <p className="font-label text-[11px] text-[var(--chalk-dim)] mb-3">
+                  Tap a program to see its day-by-day breakdown, then use it as-is — same 10 programs offered at sign-up.
+                </p>
+                {!starterPrograms ? (
+                  <p className="font-label text-[11px] text-[var(--muted)]">Loading…</p>
+                ) : (
+                  starterPrograms.map((p) => (
+                    <StarterProgramCard
+                      key={p.id}
+                      program={p}
+                      actionLabel="Use This Program"
+                      using={usingStarterId === p.id}
+                      onUse={() => handleUseStarterProgram(p)}
+                    />
+                  ))
                 )}
-                {xmlParseError && <p className="font-label text-[11px] text-[var(--red)] mb-3">{xmlParseError}</p>}
-
-                <details className="card !bg-[var(--surface2)] mb-1">
-                  <summary className="font-label text-[11px] text-[var(--chalk-dim)] cursor-pointer">XML format &amp; example</summary>
-                  <div className="font-label text-[11px] text-[var(--muted)] mt-2 space-y-1.5">
-                    <p><code>&lt;program name=&quot;...&quot;&gt;</code> — optional, prefills the name field above.</p>
-                    <p><code>&lt;schedule&gt;</code> holds up to one <code>&lt;day&gt;</code> per weekday: <code>name</code> (Sunday…Saturday), <code>type</code> (Rest, Cardio, or Workout), <code>workout</code> (required if type=Workout, must match a workout name below), <code>category</code> (Strength or Hypertrophy).</p>
-                    <p><code>&lt;workouts&gt;</code> holds <code>&lt;workout name=&quot;...&quot;&gt;</code> elements, each containing <code>&lt;exercise&gt;</code> elements with attributes <code>name</code>, <code>sets</code>, <code>repMin</code>, <code>repMax</code>, and optional <code>restSeconds</code>.</p>
-                    <a href="/example-program.xml" download className="text-[var(--red)] inline-block mt-1">Download example.xml</a>
-                  </div>
-                </details>
+                <button className="btn-ghost !py-1.5 !px-3 !text-[11px] rounded mt-1" onClick={onClose}>Cancel</button>
               </div>
             )}
 
-            {tab !== "ai" && (
+            {tab === "build" && (
               <>
                 {saveError && <p className="font-label text-[11px] text-[var(--red)] mt-3">{saveError}</p>}
                 <div className="flex gap-2 mt-3.5">

@@ -3,15 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import BrandLogo from "@/components/BrandLogo";
-
-type StarterProgram = {
-  id: number;
-  slug: string;
-  name: string;
-  level: string;
-  daysPerWeek: number;
-  workoutNames: string[];
-};
+import StarterProgramCard, { type StarterProgram } from "@/components/StarterProgramCard";
 
 export default function OnboardingClient() {
   const router = useRouter();
@@ -65,18 +57,13 @@ export default function OnboardingClient() {
         <div className="card text-center text-[var(--muted)] font-label text-xs">Loading templates…</div>
       ) : (
         programs.map((p) => (
-          <div key={p.id} className="card !py-3 !px-4 mb-2.5">
-            <div className="flex items-start justify-between gap-3 mb-1">
-              <span className="font-display text-lg leading-tight">{p.name}</span>
-              <span className="font-label text-[10px] uppercase tracking-wide text-[var(--muted)] whitespace-nowrap shrink-0 mt-1">
-                {p.daysPerWeek}x/week · {p.level}
-              </span>
-            </div>
-            <p className="font-label text-[11px] text-[var(--chalk-dim)] mb-3">{p.workoutNames.join(" · ")}</p>
-            <button className="btn-ghost w-full rounded" onClick={() => applyProgram(p.id)} disabled={applyingId !== null}>
-              {applyingId === p.id ? "Setting up…" : "Use This Program"}
-            </button>
-          </div>
+          <StarterProgramCard
+            key={p.id}
+            program={p}
+            actionLabel="Use This Program"
+            using={applyingId === p.id}
+            onUse={() => applyProgram(p.id)}
+          />
         ))
       )}
     </div>

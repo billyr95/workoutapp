@@ -229,33 +229,19 @@ export default function ProfilePage() {
         ))
       )}
 
-      <div className="section-label mb-3 mt-5 !text-[var(--red)]">Danger Zone</div>
-      <div className="card !border-[var(--red-dim)]">
-        {!confirmingDelete ? (
-          <button className="btn-ghost w-full rounded !text-[var(--red)] !border-[var(--red-dim)]" onClick={() => setConfirmingDelete(true)}>
-            Delete Account
-          </button>
-        ) : (
-          <>
-            <p className="text-[13px] leading-relaxed mb-3">
-              This permanently deletes your account and everything in it — workouts, logs, programs, weigh-ins, coaching
-              history. There&apos;s no undoing this.
-            </p>
-            <div className="flex gap-2">
-              <button className="btn-ghost flex-1 rounded" onClick={() => setConfirmingDelete(false)} disabled={deleting}>
-                Cancel
-              </button>
-              <button
-                className="btn flex-1 !bg-[var(--red)] !border-[var(--red)]"
-                onClick={deleteAccount}
-                disabled={deleting}
-              >
-                {deleting ? "Deleting…" : "Yes, Delete Everything"}
-              </button>
-            </div>
-          </>
-        )}
+      <div className="text-center mt-5">
+        <button
+          type="button"
+          className="font-label text-xs text-[var(--red)] underline"
+          onClick={() => setConfirmingDelete(true)}
+        >
+          Delete Account
+        </button>
       </div>
+
+      {confirmingDelete && (
+        <DeleteAccountModal onCancel={() => setConfirmingDelete(false)} onConfirm={deleteAccount} deleting={deleting} />
+      )}
 
       {toast && (
         <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-[var(--olive)] text-[#101410] font-label text-xs px-4 py-2.5 rounded-md z-50">
@@ -363,6 +349,54 @@ function CoachSection() {
         </div>
       ))}
     </>
+  );
+}
+
+function DeleteAccountModal({
+  onCancel,
+  onConfirm,
+  deleting,
+}: {
+  onCancel: () => void;
+  onConfirm: () => void;
+  deleting: boolean;
+}) {
+  const [confirmText, setConfirmText] = useState("");
+  const canDelete = confirmText.trim().toLowerCase() === "delete";
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="card w-full max-w-sm !border-[var(--red-dim)]">
+        <div className="font-display text-xl !text-[var(--red)] mb-2">Delete Account</div>
+        <p className="text-[13px] leading-relaxed mb-3">
+          This permanently deletes your account and everything in it — workouts, logs, programs, weigh-ins, and coaching
+          history. There&apos;s no undoing this.
+        </p>
+        <p className="font-label text-[11px] text-[var(--muted)] mb-1.5">
+          Type <span className="text-[var(--chalk)]">delete</span> to confirm.
+        </p>
+        <input
+          value={confirmText}
+          onChange={(e) => setConfirmText(e.target.value)}
+          placeholder="delete"
+          className="mb-3"
+          disabled={deleting}
+          autoFocus
+        />
+        <div className="flex gap-2">
+          <button className="btn-ghost flex-1 rounded" onClick={onCancel} disabled={deleting}>
+            Cancel
+          </button>
+          <button
+            className="btn flex-1 !bg-[var(--red)] !border-[var(--red)] disabled:opacity-40"
+            onClick={onConfirm}
+            disabled={!canDelete || deleting}
+          >
+            {deleting ? "Deleting…" : "Delete Account"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

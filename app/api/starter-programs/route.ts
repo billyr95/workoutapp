@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { auth } from "@/auth";
 
-// GET — the 10 sign-up starter programs, in display order, with a per-workout day count so
-// the picker can show a quick split summary without shipping every exercise up front.
+// GET — the 10 sign-up starter programs, in display order, with their full schedule/workout
+// data so the picker can expand a card into its day-by-day breakdown without a second fetch.
 export async function GET() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -17,7 +17,7 @@ export async function GET() {
       name: r.name,
       level: r.level,
       daysPerWeek: r.daysPerWeek,
-      workoutNames: r.data.workouts.map((w) => w.name),
+      data: r.data,
     }));
 
   return NextResponse.json(sorted);
