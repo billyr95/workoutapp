@@ -110,6 +110,14 @@ function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
 }
 
+// Beyond ~90 days there are enough points that full-size dots overlap and blur together —
+// shrink them (and their hit targets) as the span grows so dense ranges stay legible.
+function dotRadiusForSpan(spanDays: number) {
+  if (spanDays > 270) return 2.5;
+  if (spanDays > 90) return 3;
+  return 4;
+}
+
 // Catmull-Rom → cubic Bezier: turns straight-segment points into one flowing curve through
 // every point (tension 1/6, the standard conversion), instead of the angular polyline before.
 export function smoothPath(points: readonly (readonly [number, number])[]): string {
@@ -176,6 +184,9 @@ export function WeightChart({ weights, hasHistory }: { weights: { date: string; 
   });
   const path = smoothPath(points);
   const areaPath = `${path} L ${points[points.length - 1][0]} ${plotBottom} L ${points[0][0]} ${plotBottom} Z`;
+  const spanDays = (new Date(weights[weights.length - 1].date).getTime() - new Date(weights[0].date).getTime()) / 86400000;
+  const dotR = dotRadiusForSpan(spanDays);
+  const hitR = dotR + 6;
 
   function show(x: number, y: number, weight: number, date: string) {
     setHover({ x, y, title: `${weight}lb`, subtitle: formatDate(date, true) });
@@ -228,11 +239,11 @@ export function WeightChart({ weights, hasHistory }: { weights: { date: string; 
         <path d={path} fill="none" stroke="var(--chalk)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" filter="url(#chalkFilter)" opacity={0.9} />
         {points.map(([x, y], i) => (
           <g key={i}>
-            <circle cx={x} cy={y} r={4} fill="var(--red)" stroke="var(--surface)" strokeWidth={2} />
+            <circle cx={x} cy={y} r={dotR} fill="var(--red)" stroke="var(--surface)" strokeWidth={2} />
             <circle
               cx={x}
               cy={y}
-              r={10}
+              r={hitR}
               fill="transparent"
               className="cursor-pointer"
               tabIndex={0}
@@ -459,7 +470,16 @@ export function SessionSetsChart({
   );
 }
 
-export function LiftProgressChart({ series, selected }: { series: Map<string, LiftPoint[]>; selected: string[] }) {
+export function LiftProgressChart({
+  series,
+  selected,
+  onPointClick,
+}: {
+  series: Map<string, LiftPoint[]>;
+  selected: string[];
+  // When given, clicking a point jumps to that day's session instead of pinning the tooltip.
+  onPointClick?: (date: string) => void;
+}) {
   const [hover, setHover] = useState<Hover | null>(null);
   const [pinned, setPinned] = useState(false);
   const gradientPrefix = useId();
@@ -487,6 +507,8 @@ export function LiftProgressChart({ series, selected }: { series: Map<string, Li
   const midW = (minW + maxW) / 2;
   const wRange = maxW - minW || 1;
   const plotCenterX = pad + (w - pad - padRight) / 2;
+  const dotR = dotRadiusForSpan(dateRange / 86400000);
+  const hitR = dotR + 6;
 
   // A single point (or every point sharing one date) has no real date range to place along —
   // center it in the plot instead of collapsing to the left edge, where it used to sit right
@@ -513,6 +535,13 @@ export function LiftProgressChart({ series, selected }: { series: Map<string, Li
       setHover({ x, y, title, subtitle });
       return true;
     });
+  }
+  function activatePoint(x: number, y: number, weight: number, name: string, date: string) {
+    if (onPointClick) {
+      onPointClick(date);
+      return;
+    }
+    togglePin(x, y, weight, name, date);
   }
 
   // A zero date range means every point shares one date — one tick, not five identical ones.
@@ -565,26 +594,30 @@ export function LiftProgressChart({ series, selected }: { series: Map<string, Li
               {pts.length > 1 && <path d={path} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />}
               {pts.map(([x, y], i) => (
                 <g key={i}>
-                  <circle cx={x} cy={y} r={4} fill={color} stroke="var(--surface)" strokeWidth={2} />
+                  <circle cx={x} cy={y} r={dotR} fill={color} stroke="var(--surface)" strokeWidth={2} />
                   <circle
                     cx={x}
                     cy={y}
-                    r={10}
+                    r={hitR}
                     fill="transparent"
                     className="cursor-pointer"
                     tabIndex={0}
                     role="button"
-                    aria-label={`${s.name} ${formatDate(s.points[i].date, true)}: ${s.points[i].weight} pounds`}
+                    aria-label={
+                      onPointClick
+                        ? `${s.name} ${formatDate(s.points[i].date, true)}: ${s.points[i].weight} pounds — view this workout`
+                        : `${s.name} ${formatDate(s.points[i].date, true)}: ${s.points[i].weight} pounds`
+                    }
                     onMouseEnter={(e) => { e.stopPropagation(); show(x, y, s.points[i].weight, s.name, s.points[i].date); }}
                     onMouseLeave={hide}
                     onFocus={(e) => { e.stopPropagation(); show(x, y, s.points[i].weight, s.name, s.points[i].date); }}
                     onBlur={hide}
-                    onClick={(e) => { e.stopPropagation(); togglePin(x, y, s.points[i].weight, s.name, s.points[i].date); }}
+                    onClick={(e) => { e.stopPropagation(); activatePoint(x, y, s.points[i].weight, s.name, s.points[i].date); }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
                         e.stopPropagation();
-                        togglePin(x, y, s.points[i].weight, s.name, s.points[i].date);
+                        activatePoint(x, y, s.points[i].weight, s.name, s.points[i].date);
                       }
                     }}
                   />

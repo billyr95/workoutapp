@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ProgramData } from "@/db/schema";
+import Chevron from "./Chevron";
 
 export type StarterProgram = { id: number; slug: string; name: string; level: string; daysPerWeek: number; data: ProgramData };
 
@@ -25,7 +26,10 @@ export default function StarterProgramCard({
     <div className="card !py-3 !px-4 mb-2.5">
       <button type="button" className="w-full text-left" onClick={() => setExpanded((v) => !v)}>
         <div className="flex items-start justify-between gap-3 mb-1">
-          <span className="font-display text-lg leading-tight">{program.name}</span>
+          <span className="font-display text-lg leading-tight flex items-center gap-1.5">
+            {program.name}
+            <Chevron open={expanded} className="text-[var(--muted)]" />
+          </span>
           <span className="font-label text-[10px] uppercase tracking-wide text-[var(--muted)] whitespace-nowrap shrink-0 mt-1">
             {program.daysPerWeek}x/week · {program.level}
           </span>

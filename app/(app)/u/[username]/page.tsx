@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import LoadingMark from "@/components/LoadingMark";
 import FollowListModal from "@/components/FollowListModal";
+import Chevron from "@/components/Chevron";
 import { withMinDuration } from "@/lib/minDuration";
 
 type WorkoutDaySet = { exerciseName: string; setNumber: number; weight: number; reps: number };
@@ -192,7 +193,7 @@ function ProfileView({ username }: { username: string }) {
                     <span className="font-label text-xs">{d.date}</span>
                     <span className="font-label text-xs text-[var(--chalk-dim)] flex items-center gap-1.5">
                       {d.workoutName}
-                      {hasSets && <span className="text-[var(--muted)]">{isOpen ? "▲" : "▼"}</span>}
+                      {hasSets && <Chevron open={isOpen} className="text-[var(--muted)]" />}
                     </span>
                   </button>
                   {isOpen && hasSets && (

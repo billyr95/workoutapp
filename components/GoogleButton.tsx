@@ -18,7 +18,7 @@ export default function GoogleButton({
       type="button"
       onClick={() => signIn("google", { callbackUrl })}
       disabled={disabled}
-      className={`btn-ghost rounded !py-2.5 !px-4 !text-[12px] font-semibold tracking-[0.08em] uppercase flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed ${fullWidth ? "w-full" : "flex-1"}`}
+      className={`btn-ghost rounded !py-2.5 !px-4 !text-[12px] font-semibold tracking-[0.08em] uppercase flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed ${fullWidth ? "w-full" : ""}`}
     >
       <GoogleIcon />
       {compact ? "Google" : "Continue with Google"}

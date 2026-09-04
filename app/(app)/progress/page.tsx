@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAppData, Workout, WorkoutLog } from "@/lib/useAppData";
 import LoadingMark from "@/components/LoadingMark";
+import Chevron from "@/components/Chevron";
 import {
   LiftPoint,
   SessionSetGroup,
@@ -135,10 +136,11 @@ export default function ProgressPage() {
         <WeightChart weights={weights} hasHistory={allWeights.length >= 2} />
       </div>
 
+      <div className="section-label mb-3 mt-5">Today&apos;s Weight</div>
       <div className="card mb-3.5">
         <div className="flex gap-2">
           <input type="number" step="0.1" placeholder="Weight (lb)" value={weightInput} onChange={(e) => setWeightInput(e.target.value)} />
-          <button className="btn" onClick={saveWeight}>Log Today&apos;s Weight</button>
+          <button className="btn" onClick={saveWeight}>Log</button>
         </div>
       </div>
 
@@ -221,8 +223,8 @@ export default function ProgressPage() {
 
 type ChartView = "trend" | "last";
 
-// Trend vs. Last Workout switch between two mutually-exclusive full-width views instead of
-// stacking one below the other, so whichever is showing gets the full card to itself.
+// Trend vs. Individual Workout switch between two mutually-exclusive full-width views instead
+// of stacking one below the other, so whichever is showing gets the full card to itself.
 function ChartViewTabs({ view, onChange }: { view: ChartView; onChange: (v: ChartView) => void }) {
   return (
     <div className="flex gap-2 mb-3">
@@ -234,7 +236,7 @@ function ChartViewTabs({ view, onChange }: { view: ChartView; onChange: (v: Char
           className="btn-ghost flex-1 !py-1.5 !text-[12px] normal-case tracking-normal rounded"
           style={view === v ? { borderColor: "var(--olive)", color: "var(--olive)" } : undefined}
         >
-          {v === "trend" ? "Trend" : "Last Workout"}
+          {v === "trend" ? "Trend" : "Individual Workout"}
         </button>
       ))}
     </div>
@@ -346,7 +348,17 @@ function WorkoutDetail({
             </select>
           </div>
           <div className="card">
-            <LiftProgressChart series={filteredSeries} selected={exerciseNames} />
+            <LiftProgressChart
+              series={filteredSeries}
+              selected={exerciseNames}
+              onPointClick={(date) => {
+                const match = logs.find((l) => l.date === date);
+                if (match) {
+                  setSessionId(match.id);
+                  setView("last");
+                }
+              }}
+            />
           </div>
         </>
       ) : logs.length === 0 ? (
@@ -415,7 +427,7 @@ function buildExerciseSessions(workouts: Workout[], workoutLogs: WorkoutLog[], e
 }
 
 // Click a PR row to expand its own trend chart in place, scoped to just that lift, with a
-// "Show Last Workout" drill-down into any past session's set-by-set reps.
+// Individual Workout drill-down into any past session's set-by-set reps.
 function PersonalRecordRow({
   record,
   points,
@@ -429,7 +441,11 @@ function PersonalRecordRow({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [view, setView] = useState<ChartView>("trend");
+  const [range, setRange] = useState(DEFAULT_WORKOUT_RANGE);
   const chartable = points.length > 0;
+
+  const rangeStart = rangeStartDate(range);
+  const filteredPoints = rangeStart ? points.filter((p) => p.date >= rangeStart) : points;
 
   const sessions = buildExerciseSessions(workouts, workoutLogs, record.exerciseName);
   const [session, setSessionId] = useSelectedFromList(sessions);
@@ -444,8 +460,11 @@ function PersonalRecordRow({
         className="w-full flex justify-between items-center text-left disabled:cursor-default"
       >
         <span className="font-label text-[13px]">{record.exerciseName}</span>
-        <span className="font-label text-[11px] uppercase tracking-wide text-[var(--olive)]">
-          {record.weight}lb × {record.reps} — {record.date}
+        <span className="flex items-center gap-1.5 shrink-0">
+          <span className="font-label text-[11px] uppercase tracking-wide text-[var(--olive)]">
+            {record.weight}lb × {record.reps} — {record.date}
+          </span>
+          {chartable && <Chevron open={expanded} className="text-[var(--muted)]" />}
         </span>
       </button>
       {expanded && chartable && (
@@ -453,7 +472,31 @@ function PersonalRecordRow({
           <ChartViewTabs view={view} onChange={setView} />
 
           {view === "trend" ? (
-            <LiftProgressChart series={new Map([[record.exerciseName, points]])} selected={[record.exerciseName]} />
+            <>
+              <div className="flex items-center justify-between !gap-3 mb-2">
+                <span className="font-label text-[11px] text-[var(--muted)]">Range</span>
+                <select
+                  value={range}
+                  onChange={(e) => setRange(e.target.value)}
+                  className="!w-auto max-w-[130px] !py-1 !px-2 !text-[11px] normal-case tracking-normal"
+                >
+                  {WORKOUT_RANGE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              <LiftProgressChart
+                series={new Map([[record.exerciseName, filteredPoints]])}
+                selected={[record.exerciseName]}
+                onPointClick={(date) => {
+                  const match = sessions.find((s) => s.date === date);
+                  if (match) {
+                    setSessionId(match.id);
+                    setView("last");
+                  }
+                }}
+              />
+            </>
           ) : sessions.length === 0 ? (
             <p className="text-center text-[var(--muted)] font-label text-xs py-4">No sessions logged for this lift yet.</p>
           ) : (

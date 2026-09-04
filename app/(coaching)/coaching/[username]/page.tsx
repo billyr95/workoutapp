@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import LoadingMark from "@/components/LoadingMark";
+import Chevron from "@/components/Chevron";
 import { withMinDuration } from "@/lib/minDuration";
 import { buildLiftSeries, colorForLift, MAX_SELECTED_LIFTS, WeightChart, LiftProgressChart, formatDate } from "@/components/ProgressCharts";
 
@@ -319,101 +320,103 @@ function ClientDetail({ username }: { username: string }) {
       </div>
 
       <div className="section-label mb-3 !text-[var(--coach-blue)]">Weekly Split</div>
-      <div className="grid gap-2 mb-4">
+      <div className="grid gap-2 mb-6">
         {DAYS.map((d) => {
           const sched = data.schedule.find((s) => s.day === d);
           const label = sched ? `${sched.workoutType}${sched.category ? " · " + sched.category : ""}` : "Unscheduled";
+          const isEditing = d === editingDay;
           return (
-            <button
-              key={d}
-              onClick={() => selectDay(d)}
-              className={`flex justify-between items-center card !py-3 !px-3.5 text-left ${d === editingDay ? "!border-[var(--coach-blue)]" : ""}`}
-            >
-              <span className="font-display text-lg w-24">{d}</span>
-              <span className="font-label text-xs text-[var(--chalk-dim)]">{label}</span>
-            </button>
+            <div key={d} className={`card !py-3 !px-3.5 ${isEditing ? "!border-[var(--coach-blue)]" : "!border-[var(--coach-blue-dim)]"}`}>
+              <button
+                type="button"
+                onClick={() => (isEditing ? setEditingDay(null) : selectDay(d))}
+                className="w-full flex justify-between items-center text-left"
+              >
+                <span className="font-display text-lg w-24">{d}</span>
+                <span className="flex items-center gap-1.5 shrink-0">
+                  <span className="font-label text-xs text-[var(--chalk-dim)]">{label}</span>
+                  <Chevron open={isEditing} className="text-[var(--muted)]" />
+                </span>
+              </button>
+
+              {isEditing && (
+                <div className="mt-3 pt-3 border-t border-[var(--coach-blue-dim)]">
+                  <div className="flex gap-2 mb-3">
+                    {(["Rest", "Cardio", "Workout"] as DayType[]).map((t) => (
+                      <button
+                        key={t}
+                        className={`btn-ghost !py-1.5 !px-3 !text-[11px] rounded flex-1 ${dayForm.type === t ? "!border-[var(--coach-blue)] !text-[var(--chalk)]" : ""}`}
+                        onClick={() => setDayForm({ ...dayForm, type: t })}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+
+                  {dayForm.type === "Workout" && (
+                    <div className="flex gap-2 mb-1">
+                      <input
+                        placeholder="Workout name (e.g. Upper A)"
+                        value={dayForm.name}
+                        onChange={(e) => setDayForm({ ...dayForm, name: e.target.value })}
+                      />
+                      <select
+                        value={dayForm.category}
+                        onChange={(e) => setDayForm({ ...dayForm, category: e.target.value as "Strength" | "Hypertrophy" })}
+                        className="max-w-[140px]"
+                      >
+                        <option value="Strength">Strength</option>
+                        <option value="Hypertrophy">Hypertrophy</option>
+                      </select>
+                    </div>
+                  )}
+
+                  <button className="btn !bg-[var(--coach-blue)] !text-white !py-1.5 !px-3 !text-[11px] mt-1" onClick={saveDay} disabled={savingDay}>
+                    {savingDay ? "Saving…" : "Save Day"}
+                  </button>
+
+                  {isConfigurableWorkout && editingWorkout ? (
+                    <div className="mt-3 pt-3 border-t border-[var(--coach-blue-dim)]">
+                      <div className="font-display text-xl mb-2">{editingWorkout.name}</div>
+                      {editingWorkout.exercises.map((ex) => (
+                        <div key={ex.id} className="flex items-center gap-2 mb-1.5">
+                          <span className="font-label text-[13px] flex-[2]">{ex.name}</span>
+                          <span className="font-label text-xs text-[var(--chalk-dim)] flex-1">{ex.sets}×{ex.repMin}-{ex.repMax}</span>
+                          <span
+                            className="text-[var(--muted)] hover:text-[var(--red)] cursor-pointer font-label text-sm px-1.5"
+                            onClick={() => removeExercise(ex.id)}
+                          >
+                            ✕
+                          </span>
+                        </div>
+                      ))}
+                      <div className="mt-3">
+                        <input
+                          placeholder="Exercise name"
+                          value={exerciseForm.name}
+                          onChange={(e) => setExerciseForm({ ...exerciseForm, name: e.target.value })}
+                          className="mb-2"
+                        />
+                        <div className="flex gap-2">
+                          <input type="number" placeholder="Sets" value={exerciseForm.sets} onChange={(e) => setExerciseForm({ ...exerciseForm, sets: e.target.value })} />
+                          <input type="number" placeholder="Min reps" value={exerciseForm.repMin} onChange={(e) => setExerciseForm({ ...exerciseForm, repMin: e.target.value })} />
+                          <input type="number" placeholder="Max reps" value={exerciseForm.repMax} onChange={(e) => setExerciseForm({ ...exerciseForm, repMax: e.target.value })} />
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-2.5">
+                        <button className="btn !bg-[var(--coach-blue)] !text-white !py-1.5 !px-3 !text-[11px]" onClick={addExercise}>Add Exercise</button>
+                        <button className="btn-ghost !py-1.5 !px-3 !text-[11px] rounded" onClick={() => setEditingDay(null)}>Close</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button className="btn-ghost !py-1.5 !px-3 !text-[11px] rounded mt-2.5" onClick={() => setEditingDay(null)}>Close</button>
+                  )}
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
-
-      {editingDay && (
-        <div className="mb-6">
-          <div className="section-label mb-3 !text-[var(--coach-blue)]">Editing — {editingDay}</div>
-
-          <div className="card !border-[var(--coach-blue-dim)] mb-3">
-            <div className="flex gap-2 mb-3">
-              {(["Rest", "Cardio", "Workout"] as DayType[]).map((t) => (
-                <button
-                  key={t}
-                  className={`btn-ghost !py-1.5 !px-3 !text-[11px] rounded flex-1 ${dayForm.type === t ? "!border-[var(--coach-blue)] !text-[var(--chalk)]" : ""}`}
-                  onClick={() => setDayForm({ ...dayForm, type: t })}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-
-            {dayForm.type === "Workout" && (
-              <div className="flex gap-2 mb-1">
-                <input
-                  placeholder="Workout name (e.g. Upper A)"
-                  value={dayForm.name}
-                  onChange={(e) => setDayForm({ ...dayForm, name: e.target.value })}
-                />
-                <select
-                  value={dayForm.category}
-                  onChange={(e) => setDayForm({ ...dayForm, category: e.target.value as "Strength" | "Hypertrophy" })}
-                  className="max-w-[140px]"
-                >
-                  <option value="Strength">Strength</option>
-                  <option value="Hypertrophy">Hypertrophy</option>
-                </select>
-              </div>
-            )}
-
-            <button className="btn !bg-[var(--coach-blue)] !text-white !py-1.5 !px-3 !text-[11px] mt-1" onClick={saveDay} disabled={savingDay}>
-              {savingDay ? "Saving…" : "Save Day"}
-            </button>
-          </div>
-
-          {isConfigurableWorkout && editingWorkout ? (
-            <div className="card !border-[var(--coach-blue-dim)]">
-              <div className="font-display text-xl mb-2">{editingWorkout.name}</div>
-              {editingWorkout.exercises.map((ex) => (
-                <div key={ex.id} className="flex items-center gap-2 mb-1.5">
-                  <span className="font-label text-[13px] flex-[2]">{ex.name}</span>
-                  <span className="font-label text-xs text-[var(--chalk-dim)] flex-1">{ex.sets}×{ex.repMin}-{ex.repMax}</span>
-                  <span
-                    className="text-[var(--muted)] hover:text-[var(--red)] cursor-pointer font-label text-sm px-1.5"
-                    onClick={() => removeExercise(ex.id)}
-                  >
-                    ✕
-                  </span>
-                </div>
-              ))}
-              <div className="mt-3">
-                <input
-                  placeholder="Exercise name"
-                  value={exerciseForm.name}
-                  onChange={(e) => setExerciseForm({ ...exerciseForm, name: e.target.value })}
-                  className="mb-2"
-                />
-                <div className="flex gap-2">
-                  <input type="number" placeholder="Sets" value={exerciseForm.sets} onChange={(e) => setExerciseForm({ ...exerciseForm, sets: e.target.value })} />
-                  <input type="number" placeholder="Min reps" value={exerciseForm.repMin} onChange={(e) => setExerciseForm({ ...exerciseForm, repMin: e.target.value })} />
-                  <input type="number" placeholder="Max reps" value={exerciseForm.repMax} onChange={(e) => setExerciseForm({ ...exerciseForm, repMax: e.target.value })} />
-                </div>
-              </div>
-              <div className="flex gap-2 mt-2.5">
-                <button className="btn !bg-[var(--coach-blue)] !text-white !py-1.5 !px-3 !text-[11px]" onClick={addExercise}>Add Exercise</button>
-                <button className="btn-ghost !py-1.5 !px-3 !text-[11px] rounded" onClick={() => setEditingDay(null)}>Close</button>
-              </div>
-            </div>
-          ) : (
-            <button className="btn-ghost !py-1.5 !px-3 !text-[11px] rounded" onClick={() => setEditingDay(null)}>Close</button>
-          )}
-        </div>
-      )}
 
       <div className="section-label mb-3 !text-[var(--coach-blue)]">Weight Trend</div>
       <div className="card !border-[var(--coach-blue-dim)] mb-3.5">
@@ -484,7 +487,7 @@ function ClientDetail({ username }: { username: string }) {
               <span className="font-label text-xs text-[var(--chalk-dim)] flex items-center gap-1.5">
                 {workoutNameById.get(l.workoutId) ?? "Workout"}
                 {notesForDay.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-[var(--coach-blue)]" title="Has a note" />}
-                <span className="text-[var(--muted)]">{isOpen ? "▲" : "▼"}</span>
+                <Chevron open={isOpen} className="text-[var(--muted)]" />
               </span>
             </button>
             {isOpen && (

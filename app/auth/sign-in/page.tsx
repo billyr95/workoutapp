@@ -43,8 +43,8 @@ export default function SignInPage() {
             <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
           {error && <p className="font-label text-xs text-[var(--red)] mb-3">{error}</p>}
-          <div className="flex gap-2">
-            <button type="submit" className="btn flex-1" disabled={loading}>
+          <div className="flex items-center gap-2">
+            <button type="submit" className="btn" disabled={loading}>
               {loading ? "Signing in…" : "Sign In"}
             </button>
             <GoogleButton compact fullWidth={false} />

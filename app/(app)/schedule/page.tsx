@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useAppData } from "@/lib/useAppData";
 import NewProgramModal from "./NewProgramModal";
 import LoadingMark from "@/components/LoadingMark";
+import Chevron from "@/components/Chevron";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -235,7 +236,10 @@ function ScheduleContent() {
               className={`flex justify-between items-center card !py-3 !px-3.5 text-left ${d === (editingDay ?? today) ? "!border-[var(--red)]" : ""}`}
             >
               <span className="font-display text-lg w-24">{d}</span>
-              <span className="font-label text-xs text-[var(--chalk-dim)]">{label}</span>
+              <span className="flex items-center gap-1.5 shrink-0">
+                <span className="font-label text-xs text-[var(--chalk-dim)]">{label}</span>
+                <Chevron open={d === editingDay} className="text-[var(--muted)]" />
+              </span>
             </button>
           );
         })}

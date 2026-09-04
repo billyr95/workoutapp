@@ -94,8 +94,8 @@ export default function SignUpPage() {
             </span>
           </label>
           {error && <p className="font-label text-xs text-[var(--red)] mb-3">{error}</p>}
-          <div className="flex gap-2">
-            <button type="submit" className="btn flex-1" disabled={loading || !agreed}>
+          <div className="flex items-center gap-2">
+            <button type="submit" className="btn" disabled={loading || !agreed}>
               {loading ? "Creating account…" : "Sign Up"}
             </button>
             <GoogleButton compact fullWidth={false} disabled={!agreed} callbackUrl="/onboarding" />
