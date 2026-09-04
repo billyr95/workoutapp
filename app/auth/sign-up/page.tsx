@@ -49,9 +49,9 @@ export default function SignUpPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
           <BrandLogo className="h-8 w-auto mx-auto" />
-          <h1 className="font-display text-4xl leading-none mt-3">Create Account</h1>
         </div>
         <form onSubmit={handleSubmit} className="card">
+          <h1 className="font-display text-xl leading-none mb-3">Create Account</h1>
           <div className="mb-3">
             <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>

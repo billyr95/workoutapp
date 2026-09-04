@@ -229,102 +229,101 @@ function ScheduleContent() {
         {DAYS.map((d) => {
           const sched = data.schedule.find((s) => s.day === d);
           const label = sched ? `${sched.workoutType}${sched.category ? " · " + sched.category : ""}` : "Unscheduled";
+          const isEditing = d === editingDay;
           return (
-            <button
-              key={d}
-              onClick={() => selectDay(d)}
-              className={`flex justify-between items-center card !py-3 !px-3.5 text-left ${d === (editingDay ?? today) ? "!border-[var(--red)]" : ""}`}
-            >
-              <span className="font-display text-lg w-24">{d}</span>
-              <span className="flex items-center gap-1.5 shrink-0">
-                <span className="font-label text-xs text-[var(--chalk-dim)]">{label}</span>
-                <Chevron open={d === editingDay} className="text-[var(--muted)]" />
-              </span>
-            </button>
+            <div key={d} className={`card !py-3 !px-3.5 ${isEditing || (!editingDay && d === today) ? "!border-[var(--red)]" : ""}`}>
+              <button
+                type="button"
+                onClick={() => (isEditing ? setEditingDay(null) : selectDay(d))}
+                className="w-full flex justify-between items-center text-left"
+              >
+                <span className="font-display text-lg w-24">{d}</span>
+                <span className="flex items-center gap-1.5 shrink-0">
+                  <span className="font-label text-xs text-[var(--chalk-dim)]">{label}</span>
+                  <Chevron open={isEditing} className="text-[var(--muted)]" />
+                </span>
+              </button>
+
+              {isEditing && (
+                <div className="mt-3 pt-3 border-t border-[var(--line)]">
+                  <div className="flex gap-2 mb-3">
+                    {(["Rest", "Cardio", "Workout"] as DayType[]).map((t) => (
+                      <button
+                        key={t}
+                        className={`btn-ghost !py-1.5 !px-3 !text-[11px] rounded flex-1 ${dayForm.type === t ? "!border-[var(--red)] !text-[var(--chalk)]" : ""}`}
+                        onClick={() => setDayForm({ ...dayForm, type: t })}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+
+                  {dayForm.type === "Workout" && (
+                    <div className="flex gap-2 mb-1">
+                      <input
+                        placeholder="Workout name (e.g. Upper A)"
+                        value={dayForm.name}
+                        onChange={(e) => setDayForm({ ...dayForm, name: e.target.value })}
+                      />
+                      <select
+                        value={dayForm.category}
+                        onChange={(e) => setDayForm({ ...dayForm, category: e.target.value as "Strength" | "Hypertrophy" })}
+                        className="max-w-[140px]"
+                      >
+                        <option value="Strength">Strength</option>
+                        <option value="Hypertrophy">Hypertrophy</option>
+                      </select>
+                    </div>
+                  )}
+                  {dayForm.type === "Workout" && (
+                    <p className="font-label text-[10px] text-[var(--muted)] mb-2">
+                      Reuses one of your existing workouts if the name matches exactly.
+                    </p>
+                  )}
+
+                  <button className="btn !py-1.5 !px-3 !text-[11px] mt-1" onClick={saveDay} disabled={savingDay}>
+                    {savingDay ? "Saving…" : "Save Day"}
+                  </button>
+
+                  {isConfigurableWorkout && editingWorkout ? (
+                    <div className="mt-3 pt-3 border-t border-[var(--line)]">
+                      <div className="font-display text-xl mb-2">{editingWorkout.name}</div>
+                      {editingWorkout.exercises.map((ex) => (
+                        <div key={ex.id} className="flex items-center gap-2 mb-1.5">
+                          <span className="font-label text-[13px] flex-[2]">{ex.name}</span>
+                          <span className="font-label text-xs text-[var(--chalk-dim)] flex-1">
+                            {ex.sets}×{ex.repMin}-{ex.repMax}
+                          </span>
+                          <span
+                            className="text-[var(--muted)] hover:text-[var(--red)] cursor-pointer font-label text-sm px-1.5"
+                            onClick={() => removeExercise(ex.id)}
+                          >
+                            ✕
+                          </span>
+                        </div>
+                      ))}
+                      <div className="mt-3">
+                        <input placeholder="Exercise name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mb-2" />
+                        <div className="flex gap-2">
+                          <input type="number" placeholder="Sets" value={form.sets} onChange={(e) => setForm({ ...form, sets: e.target.value })} />
+                          <input type="number" placeholder="Min reps" value={form.repMin} onChange={(e) => setForm({ ...form, repMin: e.target.value })} />
+                          <input type="number" placeholder="Max reps" value={form.repMax} onChange={(e) => setForm({ ...form, repMax: e.target.value })} />
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-2.5">
+                        <button className="btn !py-1.5 !px-3 !text-[11px]" onClick={addExercise}>Add Exercise</button>
+                        <button className="btn-ghost !py-1.5 !px-3 !text-[11px] rounded" onClick={() => setEditingDay(null)}>Close</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button className="btn-ghost !py-1.5 !px-3 !text-[11px] rounded mt-2.5" onClick={() => setEditingDay(null)}>Close</button>
+                  )}
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
-
-      {editingDay && (
-        <div className="mt-6">
-          <div className="section-label mb-3">Editing — {editingDay}</div>
-
-          <div className="card mb-3">
-            <div className="flex gap-2 mb-3">
-              {(["Rest", "Cardio", "Workout"] as DayType[]).map((t) => (
-                <button
-                  key={t}
-                  className={`btn-ghost !py-1.5 !px-3 !text-[11px] rounded flex-1 ${dayForm.type === t ? "!border-[var(--red)] !text-[var(--chalk)]" : ""}`}
-                  onClick={() => setDayForm({ ...dayForm, type: t })}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-
-            {dayForm.type === "Workout" && (
-              <div className="flex gap-2 mb-1">
-                <input
-                  placeholder="Workout name (e.g. Upper A)"
-                  value={dayForm.name}
-                  onChange={(e) => setDayForm({ ...dayForm, name: e.target.value })}
-                />
-                <select
-                  value={dayForm.category}
-                  onChange={(e) => setDayForm({ ...dayForm, category: e.target.value as "Strength" | "Hypertrophy" })}
-                  className="max-w-[140px]"
-                >
-                  <option value="Strength">Strength</option>
-                  <option value="Hypertrophy">Hypertrophy</option>
-                </select>
-              </div>
-            )}
-            {dayForm.type === "Workout" && (
-              <p className="font-label text-[10px] text-[var(--muted)] mb-2">
-                Reuses one of your existing workouts if the name matches exactly.
-              </p>
-            )}
-
-            <button className="btn !py-1.5 !px-3 !text-[11px] mt-1" onClick={saveDay} disabled={savingDay}>
-              {savingDay ? "Saving…" : "Save Day"}
-            </button>
-          </div>
-
-          {isConfigurableWorkout && editingWorkout ? (
-            <div className="card">
-              <div className="font-display text-xl mb-2">{editingWorkout.name}</div>
-              {editingWorkout.exercises.map((ex) => (
-                <div key={ex.id} className="flex items-center gap-2 mb-1.5">
-                  <span className="font-label text-[13px] flex-[2]">{ex.name}</span>
-                  <span className="font-label text-xs text-[var(--chalk-dim)] flex-1">
-                    {ex.sets}×{ex.repMin}-{ex.repMax}
-                  </span>
-                  <span
-                    className="text-[var(--muted)] hover:text-[var(--red)] cursor-pointer font-label text-sm px-1.5"
-                    onClick={() => removeExercise(ex.id)}
-                  >
-                    ✕
-                  </span>
-                </div>
-              ))}
-              <div className="mt-3">
-                <input placeholder="Exercise name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mb-2" />
-                <div className="flex gap-2">
-                  <input type="number" placeholder="Sets" value={form.sets} onChange={(e) => setForm({ ...form, sets: e.target.value })} />
-                  <input type="number" placeholder="Min reps" value={form.repMin} onChange={(e) => setForm({ ...form, repMin: e.target.value })} />
-                  <input type="number" placeholder="Max reps" value={form.repMax} onChange={(e) => setForm({ ...form, repMax: e.target.value })} />
-                </div>
-              </div>
-              <div className="flex gap-2 mt-2.5">
-                <button className="btn !py-1.5 !px-3 !text-[11px]" onClick={addExercise}>Add Exercise</button>
-                <button className="btn-ghost !py-1.5 !px-3 !text-[11px] rounded" onClick={() => setEditingDay(null)}>Close</button>
-              </div>
-            </div>
-          ) : (
-            <button className="btn-ghost !py-1.5 !px-3 !text-[11px] rounded" onClick={() => setEditingDay(null)}>Close</button>
-          )}
-        </div>
-      )}
 
       {showNewProgramModal && (
         <NewProgramModal

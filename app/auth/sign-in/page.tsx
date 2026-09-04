@@ -33,9 +33,9 @@ export default function SignInPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
           <BrandLogo className="h-8 w-auto mx-auto" />
-          <h1 className="font-display text-4xl leading-none mt-3">Sign In</h1>
         </div>
         <form onSubmit={handleSubmit} className="card">
+          <h1 className="font-display text-xl leading-none mb-3">Sign In</h1>
           <div className="mb-3">
             <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
