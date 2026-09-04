@@ -9,7 +9,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { formatDate } from "@/components/ProgressCharts";
 
 export default function ProfilePage() {
-  const { data, loading, refetch } = useAppData();
+  const { data, refetch } = useAppData();
   const { data: session } = useSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -35,7 +35,7 @@ export default function ProfilePage() {
     await signOut({ callbackUrl: "/auth/sign-in" });
   }
 
-  if (loading || !data) {
+  if (!data) {
     return (
       <div className="flex justify-center py-16">
         <LoadingMark className="h-10 w-auto" />

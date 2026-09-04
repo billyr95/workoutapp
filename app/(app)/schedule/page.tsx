@@ -28,7 +28,7 @@ export default function SchedulePage() {
 }
 
 function ScheduleContent() {
-  const { data, loading, refetch } = useAppData();
+  const { data, refetch } = useAppData();
   const searchParams = useSearchParams();
   const [editingDay, setEditingDay] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", sets: "", repMin: "", repMax: "" });
@@ -59,7 +59,7 @@ function ScheduleContent() {
   const editingWorkout = data && editingSched ? data.workouts.find((w) => w.name === editingSched.workoutType) : null;
   const isConfigurableWorkout = !!(editingSched?.category && editingWorkout);
 
-  if (loading || !data) {
+  if (!data) {
     return (
       <div className="flex justify-center py-16">
         <LoadingMark className="h-10 w-auto" />

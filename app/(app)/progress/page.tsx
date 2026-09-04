@@ -40,7 +40,7 @@ const WORKOUT_RANGE_OPTIONS = [
 const DEFAULT_WORKOUT_RANGE = "30";
 
 export default function ProgressPage() {
-  const { data, loading, refetch } = useAppData();
+  const { data, refetch } = useAppData();
   const [weightInput, setWeightInput] = useState("");
   const [measureForm, setMeasureForm] = useState({ waist: "", chest: "", leftArm: "", rightArm: "", leftThigh: "", rightThigh: "" });
   const [toast, setToast] = useState<string | null>(null);
@@ -72,7 +72,7 @@ export default function ProgressPage() {
     setTimeout(() => setToast(null), 2000);
   };
 
-  if (loading || !data) {
+  if (!data) {
     return (
       <div className="flex justify-center py-16">
         <LoadingMark className="h-10 w-auto" />

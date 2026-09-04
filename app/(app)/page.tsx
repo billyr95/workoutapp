@@ -39,7 +39,7 @@ function clearDraft(workoutId: number, date: string) {
 }
 
 export default function TodayPage() {
-  const { data, loading, refetch } = useAppData();
+  const { data, refetch } = useAppData();
   const [selectedDay, setSelectedDay] = useState(DAYS[new Date().getDay()]);
   const [draft, setDraft] = useState<Record<number, DraftSet[]>>({});
   const [skipped, setSkipped] = useState<Record<number, boolean>>({});
@@ -80,7 +80,7 @@ export default function TodayPage() {
     saveDraft(workoutId, todayStr(), { draft, skipped });
   }, [workoutId, draft, skipped]);
 
-  if (loading || !data) {
+  if (!data) {
     return (
       <div className="flex justify-center py-16">
         <LoadingMark className="h-10 w-auto" />
