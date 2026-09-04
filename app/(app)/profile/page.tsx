@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { useAppData } from "@/lib/useAppData";
 import LoadingMark from "@/components/LoadingMark";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -16,11 +16,24 @@ export default function ProfilePage() {
   const [toast, setToast] = useState<string | null>(null);
   const [goalForm, setGoalForm] = useState<{ goalText?: string; heightFeet?: string; heightInches?: string; startingWeight?: string; goalWeight?: string }>({});
   const [savingGoal, setSavingGoal] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const flash = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2000);
   };
+
+  async function deleteAccount() {
+    setDeleting(true);
+    const res = await fetch("/api/account", { method: "DELETE" });
+    if (!res.ok) {
+      setDeleting(false);
+      flash("Couldn't delete your account — try again");
+      return;
+    }
+    await signOut({ callbackUrl: "/auth/sign-in" });
+  }
 
   if (loading || !data) {
     return (
@@ -215,6 +228,34 @@ export default function ProfilePage() {
           </div>
         ))
       )}
+
+      <div className="section-label mb-3 mt-5 !text-[var(--red)]">Danger Zone</div>
+      <div className="card !border-[var(--red-dim)]">
+        {!confirmingDelete ? (
+          <button className="btn-ghost w-full rounded !text-[var(--red)] !border-[var(--red-dim)]" onClick={() => setConfirmingDelete(true)}>
+            Delete Account
+          </button>
+        ) : (
+          <>
+            <p className="text-[13px] leading-relaxed mb-3">
+              This permanently deletes your account and everything in it — workouts, logs, programs, weigh-ins, coaching
+              history. There&apos;s no undoing this.
+            </p>
+            <div className="flex gap-2">
+              <button className="btn-ghost flex-1 rounded" onClick={() => setConfirmingDelete(false)} disabled={deleting}>
+                Cancel
+              </button>
+              <button
+                className="btn flex-1 !bg-[var(--red)] !border-[var(--red)]"
+                onClick={deleteAccount}
+                disabled={deleting}
+              >
+                {deleting ? "Deleting…" : "Yes, Delete Everything"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
 
       {toast && (
         <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-[var(--olive)] text-[#101410] font-label text-xs px-4 py-2.5 rounded-md z-50">
